@@ -24,8 +24,16 @@ db-down:
 logs:
 	docker compose logs -f
 
-migrate:
+migrate: db-wait
 	uv run alembic upgrade head
 
 revision:
 	uv run alembic revision -m "$(m)"
+
+.PHONY: db-wait
+
+db-wait:
+	until docker compose exec -T db pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB >/dev/null 2>&1; do \
+		echo "waiting for postgres..."; \
+		sleep 1; \
+	done
