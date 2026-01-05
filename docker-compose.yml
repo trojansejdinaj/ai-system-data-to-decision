@@ -1,0 +1,14 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: d2d_db
+      POSTGRES_USER: d2d_user
+      POSTGRES_PASSWORD: change_me_now
+    ports:
+      - "55432:5432"
+    volumes:
+      - d2d_pg:/var/lib/postgresql/data
+
+volumes:
+  d2d_pg:
