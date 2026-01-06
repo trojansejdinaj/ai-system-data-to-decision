@@ -12,6 +12,8 @@ dependencies = [
   "psycopg[binary]>=3.2",
   "pydantic-settings>=2.3",
   "setuptools>=70",
+  "python-multipart>=0.0.9",
+  "openpyxl>=3.1",
 ]
 
 [dependency-groups]

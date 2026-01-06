@@ -1,0 +1,48 @@
+from __future__ import annotations
+
+import uuid
+from datetime import UTC, datetime
+
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+
+def utcnow() -> datetime:
+    """Timezone-aware UTC 'now' for SQLAlchemy defaults."""
+    return datetime.now(UTC)
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class IngestRun(Base):
+    __tablename__ = "ingest_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    source: Mapped[str] = mapped_column(String(50))
+    status: Mapped[str] = mapped_column(String(20), default="started")
+    files: Mapped[str] = mapped_column(Text)  # newline-separated filenames for now
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    records: Mapped[list["RawRecord"]] = relationship(back_populates="run")
+
+
+class RawRecord(Base):
+    __tablename__ = "raw_records"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("ingest_runs.id"),
+        index=True,
+    )
+
+    row_num: Mapped[int] = mapped_column(Integer)
+    payload: Mapped[dict] = mapped_column(JSONB)
+    ingested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    run: Mapped[IngestRun] = relationship(back_populates="records")
