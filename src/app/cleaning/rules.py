@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any, Iterable
-
+from typing import Any
 
 NULL_LITERALS = {
     "",
@@ -228,7 +228,12 @@ def normalize_nulls(row: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def sample_before_after(before: dict[str, Any], after: dict[str, Any], *, keys: Iterable[str]) -> str:
+def sample_before_after(
+    before: dict[str, Any],
+    after: dict[str, Any],
+    *,
+    keys: Iterable[str],
+) -> str:
     lines = ["| field | before | after |", "|---|---|---|"]
     for k in keys:
         lines.append(f"| {k} | {before.get(k)!r} | {after.get(k)!r} |")

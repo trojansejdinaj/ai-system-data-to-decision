@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -28,11 +28,19 @@ class IngestRun(Base):
     files: Mapped[str] = mapped_column(Text)  # newline-separated filenames for now
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    records: Mapped[list["RawRecord"]] = relationship(back_populates="run")
+    records: Mapped[list[RawRecord]] = relationship(back_populates="run")
 
 
 class RawRecord(Base):
     __tablename__ = "raw_records"
+
+    # Dedupe rule: a raw record is uniquely identified per source by its stable record_hash.
+    __table_args__ = (
+        UniqueConstraint("source", "record_hash", name="uq_raw_records_source_record_hash"),
+        Index("ix_raw_records_source_event_time", "source", "event_time"),
+        Index("ix_raw_records_source_source_id", "source", "source_id"),
+        Index("ix_raw_records_category", "category"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     run_id: Mapped[uuid.UUID] = mapped_column(
@@ -40,6 +48,14 @@ class RawRecord(Base):
         ForeignKey("ingest_runs.id"),
         index=True,
     )
+
+    # Denormalized keys for idempotency + query performance.
+    source: Mapped[str] = mapped_column(String(50), index=True)
+    record_hash: Mapped[str] = mapped_column(String(64), index=True)
+    source_id: Mapped[str] = mapped_column(String(100))
+    event_time: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    category: Mapped[str] = mapped_column(String(100))
+    value: Mapped[str] = mapped_column(Text)
 
     row_num: Mapped[int] = mapped_column(Integer)
     payload: Mapped[dict] = mapped_column(JSONB)

@@ -1,3 +1,5 @@
+# ruff: noqa: B008
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -17,12 +19,12 @@ SAMPLES_DIR = Path(__file__).resolve().parents[3] / "data" / "samples"
 @router.post("/files")
 async def ingest_uploaded_files(
     db: Session = Depends(get_db),
-    files: Annotated[list[UploadFile], File(...)] = [],
+    files: Annotated[list[UploadFile], File(...)] | None = None,
 ):
     try:
         payloads: list[tuple[str, bytes]] = []
         for f in files:
-            payloads.append((f.filename or "unknown", await f.read()))
+                payloads.append((f.filename or "unknown", await f.read()))
 
         result = ingest_files(db=db, source="upload", files=payloads)
         return {
@@ -31,7 +33,7 @@ async def ingest_uploaded_files(
             "per_file": result.per_file,
         }
     except IngestionError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.post("/samples")
@@ -48,6 +50,6 @@ def ingest_samples(db: Session = Depends(get_db)):
             "per_file": result.per_file,
         }
     except FileNotFoundError as e:
-        raise HTTPException(status_code=500, detail=f"Missing sample file: {e}")
+        raise HTTPException(status_code=500, detail=f"Missing sample file: {e}") from e
     except IngestionError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e

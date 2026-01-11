@@ -1,4 +1,4 @@
-# ADR 0003 — Cleaning + normalization module
+# ADR 0006 — Cleaning + normalization module
 
 ## Status
 Accepted — 2026-01-19

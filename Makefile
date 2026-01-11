@@ -1,4 +1,4 @@
-.PHONY: sync fmt lint test run db-up db-down logs migrate revision
+.PHONY: sync fmt lint test run db-up db-down db-reset logs migrate revision
 
 sync:
 	uv sync
@@ -20,6 +20,11 @@ db-up:
 
 db-down:
 	docker compose down
+
+db-reset:
+	docker compose down -v
+	docker compose up -d
+	$(MAKE) migrate
 
 logs:
 	docker compose logs -f

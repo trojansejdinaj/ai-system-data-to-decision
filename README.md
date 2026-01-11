@@ -1,9 +1,10 @@
 # ai-system-data-to-decision
 
-**Status:** foundation scaffold (Week 01).  
+**Status:** ingestion + cleaning + idempotent DB persistence (Week 04).  
 This repo is the flagship “data → decision” portfolio project: a production-style backbone for ingesting raw data, storing it, transforming it, training models, and serving decisions via APIs.
 
-Right now it’s intentionally small and correct: FastAPI + Postgres + migrations + tests + a clean dev workflow.
+Right now it’s intentionally small and correct: FastAPI + Postgres + migrations + tests + a clean dev workflow —
+plus ingestion v1, deterministic cleaning rules, and DB-enforced dedupe.
 
 ---
 
@@ -15,7 +16,14 @@ Right now it’s intentionally small and correct: FastAPI + Postgres + migration
 - Run Alembic migrations via `make migrate` (with a DB readiness wait)
 - Lint/format/test with one-liner Make targets
 
-> No ingestion, ETL, or model pipeline is implemented yet — this is the “solid base” the real system will build on.
+- Ingest CSV/XLSX:
+  - `POST /ingest/samples` (loads `data/samples/`)
+  - `POST /ingest/files` (multipart upload)
+- Persist ingestion runs + raw records in Postgres
+- Enforce idempotency (no duplicate raw rows) via DB unique constraint + upsert
+- Cleaning + normalization module (`app.cleaning`) with unit tests
+
+> Models/feature engineering/decision logic are not built yet — this is the foundation + ingestion + raw staging layer.
 
 ---
 
@@ -118,13 +126,11 @@ make revision m="add_events_table"
 ```
 
 ### Note about autogenerate
-`alembic/env.py` currently has `target_metadata = None`, so **autogenerate will not detect models yet**.
-Once we add SQLAlchemy models, we’ll wire `Base.metadata` into Alembic so `--autogenerate` becomes useful.
+`alembic/env.py` is wired to `Base.metadata`, so `alembic revision --autogenerate` can detect model changes.
 
 ### Note about dotenv
-`alembic/env.py` uses `python-dotenv` (`from dotenv import load_dotenv`). If you see:
-`ModuleNotFoundError: No module named 'dotenv'`,
-add `python-dotenv` to `pyproject.toml` dependencies or remove dotenv usage and rely purely on env injection.
+`alembic/env.py` uses `python-dotenv` (`from dotenv import load_dotenv`).
+This repo includes it in `pyproject.toml` so migrations can load `.env` for local development.
 
 ---
 
@@ -136,13 +142,27 @@ Typical structure:
 ├── src/
 │   └── app/
 │       ├── main.py
+│       ├── api/
+│       │   └── ingest.py
+│       ├── ingestion/
+│       │   └── service.py
+│       ├── cleaning/
+│       │   ├── pipeline.py
+│       │   └── rules.py
 │       ├── core/
 │       │   └── config.py
 │       └── db/
+│           ├── models.py
 │           ├── session.py
 │           └── migrations/
 ├── tests/
-│   └── test_health.py
+│   ├── test_health.py
+│   ├── test_ingest.py
+│   └── test_cleaning_rules.py
+├── data/
+│   └── samples/
+│       ├── sample.csv
+│       └── sample.xlsx
 ├── docker-compose.yml
 ├── alembic.ini
 ├── pyproject.toml
@@ -162,21 +182,19 @@ Start at: `docs/00-index.md`
 
 ---
 
-## Roadmap (next real milestones)
+## Roadmap (next milestones)
 
-1) **First real table + CRUD**
-   - Add `Base`, `models`, DB dependency injection
-   - `POST /events` + `GET /events`
-   - Migration creates `events` table
-   - Tests prove write/read
+1) **Persist cleaned rows (silver table)**
+   - Run `app.cleaning` before persistence into a new `clean_records` table
+   - Keep raw → clean lineage + replay
 
-2) **Ingestion**
-   - One ingestion connector (e.g., CSV, webhook, or API pull)
-   - Idempotent upserts + basic observability
+2) **Transform + feature layer (gold tables)**
+   - Aggregations, time windows, and feature snapshots
+   - Tests for deterministic transforms
 
 3) **Decision API**
-   - Simple scoring/rules engine first
-   - Then swap in an ML model
+   - Start with rules/scoring
+   - Add model serving once data volume + stability exist
 
 ---
 

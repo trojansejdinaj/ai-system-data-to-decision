@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
+import json
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from openpyxl import load_workbook
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.db.models import IngestRun, RawRecord
@@ -21,7 +25,63 @@ class IngestionError(ValueError):
 class IngestResult:
     run_id: uuid.UUID
     total_records: int
+    inserted_records: int
+    deduped_records: int
     per_file: dict[str, int]
+
+
+def _parse_event_time(v: object) -> datetime:
+    """Best-effort parse to tz-aware UTC datetime.
+
+    We keep this intentionally strict-ish because the required schema contract
+    guarantees an event_time column. If parsing fails, we raise so we don't
+    silently write garbage keys that break dedupe.
+    """
+    if v is None:
+        raise IngestionError("event_time is required")
+
+    if isinstance(v, datetime):
+        dt = v
+    else:
+        s = str(v).strip()
+        if not s:
+            raise IngestionError("event_time is required")
+        # common ISO case: 2026-01-05T06:00:00Z
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        try:
+            dt = datetime.fromisoformat(s)
+        except ValueError as e:
+            raise IngestionError(f"Invalid event_time format: {v!r}") from e
+
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
+
+
+def _norm_str(v: object) -> str:
+    return "" if v is None else str(v).strip()
+
+
+def _extract_keys(payload: dict) -> tuple[str, datetime, str, str, str]:
+    """Extract and normalize required keys + compute record hash.
+
+    Returns: (source_id, event_time_dt, category, value, record_hash)
+    """
+    source_id = _norm_str(payload.get("source_id"))
+    category = _norm_str(payload.get("category")).lower()
+    value = _norm_str(payload.get("value"))
+    event_dt = _parse_event_time(payload.get("event_time"))
+
+    key = {
+        "source_id": source_id,
+        "event_time": event_dt.isoformat(),
+        "category": category,
+        "value": value,
+    }
+    encoded = json.dumps(key, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    record_hash = hashlib.sha256(encoded).hexdigest()
+    return source_id, event_dt, category, value, record_hash
 
 
 def _validate_headers(headers: list[str]) -> None:
@@ -69,6 +129,8 @@ def ingest_files(db: Session, source: str, files: list[tuple[str, bytes]]) -> In
 
     per_file: dict[str, int] = {}
     total = 0
+    inserted = 0
+    deduped = 0
 
     try:
         for filename, data in files:
@@ -76,18 +138,45 @@ def ingest_files(db: Session, source: str, files: list[tuple[str, bytes]]) -> In
             per_file[filename] = len(rows)
             total += len(rows)
 
+            if not rows:
+                continue
+
+            now = datetime.now(UTC)
+            values: list[dict] = []
             for idx, payload in enumerate(rows, start=1):
-                db.add(
-                    RawRecord(
-                        run_id=run.id,
-                        row_num=idx,
-                        payload=payload,
-                    )
+                source_id, event_dt, category, value, record_hash = _extract_keys(payload)
+                values.append(
+                    {
+                        "id": uuid.uuid4(),
+                        "run_id": run.id,
+                        "row_num": idx,
+                        "payload": payload,
+                        "ingested_at": now,
+                        "source": source,
+                        "record_hash": record_hash,
+                        "source_id": source_id,
+                        "event_time": event_dt,
+                        "category": category,
+                        "value": value,
+                    }
                 )
+
+            stmt = pg_insert(RawRecord.__table__).values(values)
+            stmt = stmt.on_conflict_do_nothing(index_elements=["source", "record_hash"])
+            res = db.execute(stmt)
+            added = int(res.rowcount or 0)
+            inserted += added
+            deduped += len(values) - added
 
         run.status = "success"
         db.commit()
-        return IngestResult(run_id=run.id, total_records=total, per_file=per_file)
+        return IngestResult(
+            run_id=run.id,
+            total_records=total,
+            inserted_records=inserted,
+            deduped_records=deduped,
+            per_file=per_file,
+        )
 
     except Exception as e:
         db.rollback()
