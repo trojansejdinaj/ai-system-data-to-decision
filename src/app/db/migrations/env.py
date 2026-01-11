@@ -28,6 +28,7 @@ config = context.config
 # Override sqlalchemy.url from DATABASE_URL if present
 _db_url = os.environ.get("DATABASE_URL")
 if _db_url:
+    _db_url = _db_url.replace("%", "%%")
     config.set_main_option("sqlalchemy.url", _db_url)
 
 # Interpret the config file for Python logging.

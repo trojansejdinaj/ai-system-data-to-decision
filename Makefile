@@ -1,4 +1,4 @@
-.PHONY: sync fmt lint test run db-up db-down db-reset logs migrate revision
+.PHONY: sync fmt lint test run db-up db-down db-reset logs migrate revision metrics
 
 sync:
 	uv sync
@@ -13,7 +13,8 @@ test:
 	uv run pytest -q
 
 run:
-	uv run uvicorn src.app.main:app --reload --host 0.0.0.0 --port 8000
+	@set -a; . ./.env; set +a; \
+	PYTHONPATH=src uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 db-up:
 	docker compose up -d
@@ -34,6 +35,12 @@ migrate: db-wait
 
 revision:
 	uv run alembic revision -m "$(m)"
+
+metrics:
+	@set -a; . ./.env; set +a; \
+	docker compose exec -T db psql -U $$POSTGRES_USER -d $$POSTGRES_DB < src/app/transform/monthly_metrics.sql
+	@set -a; . ./.env; set +a; \
+	docker compose exec -T db psql -U $$POSTGRES_USER -d $$POSTGRES_DB -c "SELECT * FROM summary.monthly_metrics ORDER BY month_start;"
 
 .PHONY: db-wait
 
