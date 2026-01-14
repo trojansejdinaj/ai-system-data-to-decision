@@ -1,509 +1,196 @@
 # Troubleshooting Runbook
 
-This guide covers common issues and solutions for local development.
+Use this when local dev breaks. The goal is to get you back to a working state fast.
 
 ---
 
-## Getting Help
+## Fast triage checklist (do this first)
 
-1. Check this runbook first
-2. Search logs: `make logs`
-3. Check [ADRs](../decisions/) for design decisions
-4. Verify `.env` configuration
-
----
-
-## Database Issues
-
-### "Port 55432 already in use"
-
-**Problem:** Docker Compose can't bind to the default port.
-
-**Solution:**
-
-1. Find what's using the port:
-   ```bash
-   lsof -i :55432
-   kill -9 <PID>
-   ```
-
-2. Or change the port in `.env`:
-   ```env
-   POSTGRES_PORT=55433
-   ```
-
-3. Restart:
-   ```bash
-   make db-down
-   make db-up
-   ```
-
----
-
-### "Connection refused" or "postgres not ready"
-
-**Problem:** The app can't connect to the database.
-
-**Solution:**
-
-1. Check if Postgres is running:
-   ```bash
-   docker compose ps
-   ```
-   Should show `postgres ... (healthy)`
-
-2. Wait for readiness:
-   ```bash
-   make db-wait
-   ```
-
-3. Check logs:
-   ```bash
-   make logs
-   ```
-   Look for error messages in the output.
-
-4. Verify `.env`:
-   ```bash
-   cat .env | grep DATABASE_URL
-   ```
-   Should match the running container credentials.
-
-5. Restart:
-   ```bash
-   make db-down
-   make db-up
-   make db-wait
-   ```
-
----
-
-### "POSTGRES_PASSWORD not set"
-
-**Problem:** Docker Compose refuses to start because `POSTGRES_PASSWORD` is missing.
-
-**Solution:**
-
-1. Create `.env` from template:
-   ```bash
-   cp .env.example .env
-   ```
-
-2. Edit and set a password:
-   ```bash
-   cat .env
-   # Edit POSTGRES_PASSWORD line to something like: POSTGRES_PASSWORD=devpassword123
-   ```
-
-3. Restart:
-   ```bash
-   make db-down
-   make db-up
-   ```
-
----
-
-### "Database locked" or "Cannot acquire lock"
-
-**Problem:** A long-running transaction or connection is holding a lock.
-
-**Solution:**
-
-1. Kill all idle connections:
-   ```bash
-   docker compose exec db psql -U d2d_user -d d2d_db -c \
-     "SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity 
-      WHERE datname = 'd2d_db' AND pid <> pg_backend_pid();"
-   ```
-
-2. Try again:
-   ```bash
-   make migrate
-   ```
-
----
-
-## Application Issues
-
-### "ModuleNotFoundError: No module named 'fastapi'"
-
-**Problem:** Dependencies are not installed.
-
-**Solution:**
-
+### 1) Is the API running?
 ```bash
-make sync
+curl -i http://localhost:8000/health
 ```
 
-This installs all dependencies from `pyproject.toml` using `uv`.
-
----
-
-### "ImportError: cannot import name 'app' from 'src.app.main'"
-
-**Problem:** Python path or package setup is broken.
-
-**Solution:**
-
-1. Verify `src/` has `__init__.py`:
-   ```bash
-   ls src/__init__.py
-   ls src/app/__init__.py
-   ```
-
-2. Reinstall:
-   ```bash
-   make sync
-   ```
-
-3. Try running directly:
-   ```bash
-   cd /path/to/repo
-   uv run python -c "from src.app.main import app; print(app)"
-   ```
-
----
-
-### "GET /health returns 404 or 500"
-
-**Problem:** The API isn't responding correctly.
-
-**Solution:**
-
-1. Check the API is running:
-   ```bash
-   curl http://localhost:8000/health
-   ```
-
-2. If no response, start it:
-   ```bash
-   make run
-   ```
-
-3. Check stdout/stderr for errors (should show reload output).
-
-4. Verify the code in `src/app/main.py`:
-   ```bash
-   grep -A5 "@app.get" src/app/main.py
-   ```
-   Should have a `/health` route.
-
----
-
-## Dependency Issues
-
-### "ruff: command not found"
-
-**Problem:** Development dependencies aren't installed.
-
-**Solution:**
-
+### 2) Is Postgres running and healthy?
 ```bash
-make sync
+docker compose ps
 ```
 
-Then verify:
-
+### 3) Do migrations match the DB?
 ```bash
-uv run ruff --version
+uv run alembic current
+```
+
+### 4) Can the dashboard endpoints respond?
+```bash
+curl -i http://localhost:8000/dashboard/monthly
+curl -i "http://localhost:8000/dashboard/trend?start=2025-12-15&end=2026-01-14"
+```
+
+### 5) Look at logs
+- API logs: the terminal where uvicorn is running
+- Docker logs:
+```bash
+make logs
 ```
 
 ---
 
-### "uv: command not found"
+## Database issues
 
-**Problem:** `uv` isn't installed or not in PATH.
+### Problem: Postgres won’t accept connections
+**Symptoms**
+- `connection refused`
+- `could not connect to server`
+- `timeout`
 
-**Solution:**
-
-1. Install `uv`:
-   ```bash
-   curl -LsSf https://astral.sh/uv/install.sh | sh
-   ```
-
-2. Add to PATH (if needed):
-   ```bash
-   export PATH="$HOME/.cargo/bin:$PATH"
-   ```
-
-3. Verify:
-   ```bash
-   uv --version
-   ```
-
----
-
-## Migration Issues
-
-### "Alembic revision fails with 'No changes detected'"
-
-**Problem:** The model change wasn't detected by Alembic.
-
-**Solution:**
-
-1. Verify the model was edited correctly (check imports, column definitions).
-
-2. If you added a new model class, ensure it's imported in `env.py`:
-   ```bash
-   grep "from src.app.db" src/app/db/migrations/env.py
-   ```
-
-3. Create the migration manually:
-   ```bash
-   uv run alembic revision -m "add my_table" --autogenerate
-   ```
-
-4. Edit `src/app/db/migrations/versions/abc123_*.py` with your SQL:
-   ```python
-   def upgrade() -> None:
-       op.create_table('my_table', ...)
-   
-   def downgrade() -> None:
-       op.drop_table('my_table')
-   ```
-
-5. Apply:
-   ```bash
-   make migrate
-   ```
-
----
-
-### "Migration fails with SQL syntax error"
-
-**Problem:** The generated or manual migration has invalid SQL.
-
-**Solution:**
-
-1. Check the error:
-   ```bash
-   make migrate
-   ```
-
-2. Open the migration file and fix the SQL:
-   ```bash
-   nano src/app/db/migrations/versions/abc123_*.py
-   ```
-
-3. Re-run:
-   ```bash
-   make migrate
-   ```
-
----
-
-### "Can't downgrade migration"
-
-**Problem:** The `downgrade()` function is missing or broken.
-
-**Solution:**
-
-1. Check the file:
-   ```bash
-   grep -A5 "def downgrade" src/app/db/migrations/versions/abc123_*.py
-   ```
-
-2. If empty, add it manually:
-   ```python
-   def downgrade() -> None:
-       op.drop_table('my_table')  # Or whatever undoes upgrade()
-   ```
-
-3. Try downgrading:
-   ```bash
-   uv run alembic downgrade -1
-   ```
-
----
-
-## Code Quality Issues
-
-### "Lint errors: line too long, unused import"
-
-**Problem:** Code doesn't match ruff's style rules.
-
-**Solution:**
-
-Auto-fix:
-
+**Fix**
 ```bash
-make lint
+make db-up
+make db-wait
 ```
 
-Or format only:
-
+If it still fails:
 ```bash
-make fmt
+docker compose ps
+make logs
 ```
 
-Check the rules in `pyproject.toml`:
-
+Destructive reset (wipes DB volume):
 ```bash
-grep -A10 "\[tool.ruff" pyproject.toml
+make db-reset
 ```
 
 ---
 
-### "Pytest fails: test discovery error"
+### Problem: `psql` command fails with role/user errors (e.g. role "root" does not exist)
+**Cause**
+- You ran `psql` without passing the correct user/db, so it defaulted to your shell user.
 
-**Problem:** Tests aren't being found or imported.
-
-**Solution:**
-
-1. Check test file naming:
-   ```bash
-   ls tests/test_*.py
-   ```
-   Must start with `test_`.
-
-2. Check `pytest.ini`:
-   ```bash
-   cat pytest.ini
-   ```
-   Should have `testpaths = ["tests"]`.
-
-3. Verify imports in the test file:
-   ```bash
-   grep "^import\|^from" tests/test_health.py
-   ```
-
-4. Run with verbose output:
-   ```bash
-   uv run pytest -v
-   ```
-
----
-
-## Docker Issues
-
-### "Docker daemon not running"
-
-**Problem:** Docker service isn't started.
-
-**Solution:**
-
-1. Start Docker:
-   ```bash
-   # macOS
-   open /Applications/Docker.app
-   
-   # Linux (systemd)
-   sudo systemctl start docker
-   ```
-
-2. Verify:
-   ```bash
-   docker ps
-   ```
-
----
-
-### "Cannot connect to Docker socket"
-
-**Problem:** User doesn't have Docker permissions.
-
-**Solution:**
-
-1. Add your user to the docker group:
-   ```bash
-   sudo usermod -aG docker $USER
-   newgrp docker
-   ```
-
-2. Verify:
-   ```bash
-   docker ps
-   ```
-
----
-
-### "Container exits immediately"
-
-**Problem:** The database container won't stay running.
-
-**Solution:**
-
-1. Check logs:
-   ```bash
-   docker compose logs db
-   ```
-
-2. Check the image:
-   ```bash
-   docker compose ps
-   ```
-
-3. Look for common issues:
-   - Permissions problem on volume
-   - Invalid environment variable
-   - Port conflict
-
-4. Reset:
-   ```bash
-   docker compose down -v
-   docker compose up
-   ```
-
----
-
-## File & Permission Issues
-
-### "Permission denied" on `.env`
-
-**Problem:** The `.env` file has wrong permissions.
-
-**Solution:**
-
+**Fix**
+Use the container env values:
 ```bash
-chmod 600 .env
+docker compose exec -T db bash -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```
+
+Or connect from host with explicit values:
+```bash
+psql -h localhost -p 55432 -U d2d_user -d d2d_db
 ```
 
 ---
 
-### ".gitignore not working for .env"
+## Migration issues
 
-**Problem:** `.env` is still being tracked by git.
+### Problem: Alembic says `head` but tables are missing
+**Cause**
+- A migration can be applied (version advances) even if its `upgrade()` did nothing (no-op or empty).
 
-**Solution:**
-
+**Fix**
+Force re-run by downgrading then upgrading:
 ```bash
-git rm --cached .env
-git commit -m "Stop tracking .env"
-git status  # Should no longer list .env
+uv run alembic downgrade -1
+uv run alembic upgrade head
+```
+
+Verify schema:
+```bash
+psql -h localhost -p 55432 -U d2d_user -d d2d_db -c "\dt summary.*"
 ```
 
 ---
 
-## Getting More Help
+### Problem: Downgrade fails because an object is a VIEW vs TABLE
+**Symptoms**
+- `WrongObjectType ... is not a table`
+- hint says `Use DROP VIEW`
 
-1. **Check logs:**
-   ```bash
-   make logs
-   docker compose logs db
-   ```
+**Fix**
+Make downgrade robust in migration code:
+```sql
+DROP VIEW IF EXISTS summary.monthly_metrics;
+DROP TABLE IF EXISTS summary.monthly_metrics;
+```
 
-2. **Check status:**
-   ```bash
-   docker compose ps
-   docker system df
-   ```
-
-3. **Clean everything:**
-   ```bash
-   docker compose down -v
-   make sync
-   make db-up
-   make db-wait
-   make migrate
-   make run
-   ```
-
-4. **Search ADRs:** Check [decisions](../decisions/) for design rationale.
+Then retry downgrade/upgrade.
 
 ---
 
-## Next Steps
+## Import / module issues
 
-- See [local dev runbook](./local-dev.md) for setup
-- See [database runbook](./database.md) for DB-specific issues
-- See [migrations runbook](./migrations.md) for migration help
+### Problem: `ModuleNotFoundError: No module named 'app'`
+**Cause**
+- Repo uses `src/` layout and imports like `from app...`.
+- If `src` isn’t on `PYTHONPATH`, `app` can’t be resolved.
+
+**Fix**
+Use Makefile targets (they set `PYTHONPATH=src`) or run manually:
+```bash
+PYTHONPATH=src uv run uvicorn app.main:app --reload --env-file .env
+```
+
+---
+
+### Problem: You accidentally used `scr` instead of `src`
+**Symptoms**
+- `ModuleNotFoundError: No module named 'scr'`
+
+**Fix**
+Use the correct module path:
+- `uvicorn app.main:app` with `PYTHONPATH=src`
+- (or) `uvicorn src.app.main:app` if you switch imports to `from src.app...`
+
+---
+
+## Dashboard issues
+
+### Problem: `/dashboard` loads but `/dashboard/monthly` returns 500
+**Common causes**
+- Missing summary tables
+- API connected to the wrong database
+- SQL parameter typing errors
+
+**Fix**
+1) Confirm summary tables:
+```bash
+psql -h localhost -p 55432 -U d2d_user -d d2d_db -c "\dt summary.*"
+```
+
+2) Confirm API is loading `.env`:
+- run via Makefile or with:
+```bash
+PYTHONPATH=src uv run uvicorn app.main:app --reload --env-file .env
+```
+
+3) If error mentions `AmbiguousParameter`:
+**Cause**
+- Postgres can’t infer the type of NULL query params.
+
+**Fix**
+Cast optional params in SQL:
+```sql
+WHERE (CAST(:start AS date) IS NULL OR month_start >= CAST(:start AS date))
+  AND (CAST(:end AS date) IS NULL OR month_start < CAST(:end AS date))
+```
+
+---
+
+## “Nuke it from orbit” (last resort)
+
+If you want a clean slate (dev only, wipes DB):
+```bash
+docker compose down -v
+make dev-all
+```
+
+---
+
+## Quick reference
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `role "root" does not exist` | wrong psql user | pass `-U` / use container `bash -lc` |
+| `No module named app` | src not on PYTHONPATH | `PYTHONPATH=src ...` |
+| `No module named scr` | typo | use `src` not `scr` |
+| Alembic head but missing tables | no-op migration | downgrade/upgrade |
+| Monthly endpoint 500 + AmbiguousParameter | NULL param typing | CAST params to date |

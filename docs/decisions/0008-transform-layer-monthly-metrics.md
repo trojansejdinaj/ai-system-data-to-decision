@@ -8,8 +8,9 @@ We need reproducible monthly metrics derived from persisted data, with clear def
 
 ## Decision
 - Implement monthly metrics as SQL in `src/app/transform/monthly_metrics.sql`
-- Materialize results as a view:
-  - `summary.monthly_metrics`
+- Materialize results under `summary.monthly_metrics`
+  - Week 05: view (iteration)
+  - Week 06: table (dashboard snapshot + predictable performance)
 - Create a checks table to log validation outcomes:
   - `summary.data_quality_checks`
 - Base metrics on persisted, deduped raw records:
@@ -17,11 +18,10 @@ We need reproducible monthly metrics derived from persisted data, with clear def
 
 ## Rationale
 - SQL is auditable and easy to review.
-- A view allows rapid iteration while metrics stabilize.
+- Starting with a view allows rapid iteration while metrics stabilize.
+- Materializing into a table supports dashboard performance and stable snapshots.
 - Dedupe is enforced at the database level via unique `(source, record_hash)`.
-- The checks table enables future automated validation without changing the metric view.
+- The checks table enables future automated validation without changing the core metrics contract.
 
-## Consequences
-- Metrics are consistent and reproducible for a given DB state.
-- Numeric aggregations over `value` are deferred until a typed clean layer is introduced.
-- We can later switch from view → table if performance or snapshotting becomes necessary.
+## Notes
+Metric definitions are documented in `docs/architecture/04-monthly-metrics.md`.
