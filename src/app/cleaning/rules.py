@@ -55,14 +55,14 @@ def normalize_category(value: Any, mapping: dict[str, str]) -> str | None:
 
 
 _DATE_FORMATS = (
-    "%Y-%m-%d",          # 2026-01-09
-    "%Y/%m/%d",          # 2026/01/09
-    "%d/%m/%Y",          # 09/01/2026
-    "%m/%d/%Y",          # 01/09/2026 (ambiguous)
-    "%d-%m-%Y",          # 09-01-2026
-    "%m-%d-%Y",          # 01-09-2026
-    "%Y-%m-%dT%H:%M:%S", # 2026-01-09T12:30:00
-    "%Y-%m-%d %H:%M:%S", # 2026-01-09 12:30:00
+    "%Y-%m-%d",  # 2026-01-09
+    "%Y/%m/%d",  # 2026/01/09
+    "%d/%m/%Y",  # 09/01/2026
+    "%m/%d/%Y",  # 01/09/2026 (ambiguous)
+    "%d-%m-%Y",  # 09-01-2026
+    "%m-%d-%Y",  # 01-09-2026
+    "%Y-%m-%dT%H:%M:%S",  # 2026-01-09T12:30:00
+    "%Y-%m-%d %H:%M:%S",  # 2026-01-09 12:30:00
 )
 
 
@@ -201,6 +201,7 @@ class OutlierRule:
     Simple guardrail outlier rule:
     - If numeric value is outside [min_value, max_value], set to None.
     """
+
     min_value: float | None = None
     max_value: float | None = None
 

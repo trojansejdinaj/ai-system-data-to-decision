@@ -24,7 +24,7 @@ async def ingest_uploaded_files(
     try:
         payloads: list[tuple[str, bytes]] = []
         for f in files:
-                payloads.append((f.filename or "unknown", await f.read()))
+            payloads.append((f.filename or "unknown", await f.read()))
 
         result = ingest_files(db=db, source="upload", files=payloads)
         return {

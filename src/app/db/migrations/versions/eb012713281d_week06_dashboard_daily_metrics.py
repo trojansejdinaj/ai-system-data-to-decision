@@ -5,6 +5,7 @@ Revises: c7b2d771f7a0
 Create Date: 2026-01-13 23:42:42.160251
 
 """
+
 from alembic import op
 
 # IMPORTANT:
@@ -38,7 +39,9 @@ def upgrade() -> None:
     )
 
     # helpful for filtering by ranges
-    op.execute("CREATE INDEX IF NOT EXISTS ix_daily_metrics_day_date ON summary.daily_metrics(day_date);")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_daily_metrics_day_date ON summary.daily_metrics(day_date);"
+    )
 
     # backfill
     op.execute(

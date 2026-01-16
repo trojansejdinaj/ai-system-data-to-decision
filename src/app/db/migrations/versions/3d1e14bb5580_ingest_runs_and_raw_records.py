@@ -5,11 +5,12 @@ Revises: a860ab63f293
 Create Date: 2026-01-06 07:20:00.181939
 
 """
+
 from collections.abc import Sequence
 
 # revision identifiers, used by Alembic.
-revision: str = '3d1e14bb5580'
-down_revision: str | Sequence[str] | None = 'a860ab63f293'
+revision: str = "3d1e14bb5580"
+down_revision: str | Sequence[str] | None = "a860ab63f293"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

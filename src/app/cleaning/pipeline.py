@@ -22,6 +22,7 @@ class CleaningConfig:
     """
     Week 03 config: explicit, boring, predictable.
     """
+
     # If set, remove keys not in this set
     allowed_keys: set[str] | None = None
 

@@ -1,14 +1,15 @@
 """init
 
 Revision ID: 78b15fee4f9b
-Revises: 
+Revises:
 Create Date: 2026-01-05 10:11:46.476786
 
 """
+
 from collections.abc import Sequence
 
 # revision identifiers, used by Alembic.
-revision: str = '78b15fee4f9b'
+revision: str = "78b15fee4f9b"
 down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None

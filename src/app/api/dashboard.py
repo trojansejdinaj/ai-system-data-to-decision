@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 
-from src.app.schemas.dashboard import MonthlySummaryRow, TrendResponse
-from src.app.services.dashboard import fetch_monthly_summary, fetch_trend
+from app.schemas.dashboard import MonthlySummaryRow, TrendResponse
+from app.services.dashboard import fetch_monthly_summary, fetch_trend
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
