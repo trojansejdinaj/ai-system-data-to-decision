@@ -1,7 +1,8 @@
 .PHONY: \
 	sync fmt lint test run dev-all \
 	db-up db-down db-reset db-wait \
-	logs migrate revision metrics
+	logs migrate revision metrics \
+	test-integration
 
 sync:
 	uv sync
@@ -13,7 +14,10 @@ lint:
 	uv run ruff check . --fix
 
 test:
-	uv run pytest -q
+	uv run pytest -q -m "not integration"
+
+test-integration:
+	uv run pytest -q -m integration
 
 # Keep "from app..." imports working with src-layout:
 # - PYTHONPATH=src makes src/app importable as "app"

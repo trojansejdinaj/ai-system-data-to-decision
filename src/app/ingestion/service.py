@@ -13,6 +13,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.db.models import IngestRun, RawRecord
+from app.observability.logging import get_logger
+from app.observability.run_tracking import RunTracker
 
 REQUIRED_COLUMNS = ["source_id", "event_time", "value", "category"]
 
@@ -123,6 +125,10 @@ def _parse_by_extension(filename: str, data: bytes) -> list[dict]:
 
 
 def ingest_files(db: Session, source: str, files: list[tuple[str, bytes]]) -> IngestResult:
+    logger = get_logger(__name__)
+    input_ref = ",".join([f[0] for f in files])
+    tracker = RunTracker(db, logger, pipeline="ingest", input_ref=input_ref)
+
     run = IngestRun(source=source, files="\n".join([f[0] for f in files]), status="started")
     db.add(run)
     db.flush()  # get run.id
@@ -134,42 +140,47 @@ def ingest_files(db: Session, source: str, files: list[tuple[str, bytes]]) -> In
 
     try:
         for filename, data in files:
-            rows = _parse_by_extension(filename, data)
+            with tracker.step("parse", meta={"filename": filename}):
+                rows = _parse_by_extension(filename, data)
             per_file[filename] = len(rows)
             total += len(rows)
 
             if not rows:
                 continue
 
-            now = datetime.now(UTC)
-            values: list[dict] = []
-            for idx, payload in enumerate(rows, start=1):
-                source_id, event_dt, category, value, record_hash = _extract_keys(payload)
-                values.append(
-                    {
-                        "id": uuid.uuid4(),
-                        "run_id": run.id,
-                        "row_num": idx,
-                        "payload": payload,
-                        "ingested_at": now,
-                        "source": source,
-                        "record_hash": record_hash,
-                        "source_id": source_id,
-                        "event_time": event_dt,
-                        "category": category,
-                        "value": value,
-                    }
-                )
+            with tracker.step("upsert", meta={"filename": filename, "row_count": len(rows)}):
+                now = datetime.now(UTC)
+                values: list[dict] = []
+                for idx, payload in enumerate(rows, start=1):
+                    source_id, event_dt, category, value, record_hash = _extract_keys(payload)
+                    values.append(
+                        {
+                            "id": uuid.uuid4(),
+                            "run_id": run.id,
+                            "row_num": idx,
+                            "payload": payload,
+                            "ingested_at": now,
+                            "source": source,
+                            "record_hash": record_hash,
+                            "source_id": source_id,
+                            "event_time": event_dt,
+                            "category": category,
+                            "value": value,
+                        }
+                    )
 
-            stmt = pg_insert(RawRecord.__table__).values(values)
-            stmt = stmt.on_conflict_do_nothing(index_elements=["source", "record_hash"])
-            res = db.execute(stmt)
-            added = int(res.rowcount or 0)
-            inserted += added
-            deduped += len(values) - added
+                stmt = pg_insert(RawRecord.__table__).values(values)
+                stmt = stmt.on_conflict_do_nothing(index_elements=["source", "record_hash"])
+                res = db.execute(stmt)
+                added = int(res.rowcount or 0)
+                inserted += added
+                deduped += len(values) - added
 
         run.status = "success"
         db.commit()
+
+        tracker.succeed()
+
         return IngestResult(
             run_id=run.id,
             total_records=total,
@@ -179,6 +190,7 @@ def ingest_files(db: Session, source: str, files: list[tuple[str, bytes]]) -> In
         )
 
     except Exception as e:
+        tracker.fail(e)
         db.rollback()
         run.status = "failed"
         run.error = str(e)

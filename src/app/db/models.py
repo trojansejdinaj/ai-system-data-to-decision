@@ -62,3 +62,23 @@ class RawRecord(Base):
     ingested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     run: Mapped[IngestRun] = relationship(back_populates="records")
+
+
+class PipelineRun(Base):
+    __tablename__ = "pipeline_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    pipeline: Mapped[str] = mapped_column(String(50), index=True)
+    status: Mapped[str] = mapped_column(String(20), default="running", index=True)
+
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    input_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
+    meta: Mapped[dict] = mapped_column(JSONB, default=dict)
+    steps: Mapped[list] = mapped_column(JSONB, default=list)
+
+    error_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
