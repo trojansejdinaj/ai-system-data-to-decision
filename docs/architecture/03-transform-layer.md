@@ -1,26 +1,40 @@
-# Transform layer
+# Transform Layer (Gold)
 
-## Purpose
-The transform layer turns persisted data into decision-ready datasets.
-
-In this project, the transform layer currently produces a **monthly metrics summary** using SQL that can be run repeatedly with deterministic results.
+This repo uses a simple 3-layer data flow:
 
 ## Layers
-- **raw**: `public.raw_records` (source-shaped with dedupe keys)
-- **summary**: `summary.monthly_metrics` (monthly rollups)
 
-A dedicated clean persistence layer can be added later; for now, metrics are derived from persisted raw records (post-dedupe).
+### Bronze (raw)
+- **Table:** `public.raw_records`
+- **Producer:** ingestion endpoints (`POST /ingest/samples`, `POST /ingest/files`)
+- **Contract:** store the raw payload + stable dedupe hash (idempotency)
 
-## Transform artifacts
-- SQL source of truth:
-  - `src/app/transform/monthly_metrics.sql`
-- Summary view:
-  - `summary.monthly_metrics`
-- Data quality checks log:
-  - `summary.data_quality_checks`
+### Silver (clean)
+- **Table:** `clean.clean_records`
+- **Producer:** cleaning pipeline (`make clean`)
+- **Goal:** deterministic normalization (types, null handling, cleaned text/category/value, preserved lineage keys)
 
-## Reproducibility rules
-- Month bucketing uses `event_time` (timestamptz) with:
-  - `month_start = date_trunc('month', event_time)::date`
-- Deduplication relies on unique `(source, record_hash)` in `public.raw_records`
-- Metrics are recomputed from persisted rows (no manual spreadsheet edits)
+### Gold (summary)
+- **View:** `summary.monthly_metrics`
+- **Producer:** metrics refresh (`make metrics`)
+- **Goal:** stable monthly rollups used by the dashboard and downstream decisions
+
+---
+
+## Why a view for monthly metrics?
+A view keeps the “gold” layer reproducible from silver without copy/duplication.
+
+If you later need performance:
+- materialize into a table
+- schedule refreshes
+- snapshot by month
+
+---
+
+## How to run the full flow
+
+```bash
+make demo      # bronze + flags
+make clean     # silver
+make metrics   # gold
+make runs      # show run tracking

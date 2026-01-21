@@ -1,196 +1,146 @@
 # Troubleshooting Runbook
 
-Use this when local dev breaks. The goal is to get you back to a working state fast.
+Use this when local dev breaks. Goal: get back to green fast.
 
 ---
 
-## Fast triage checklist (do this first)
+## Fast triage checklist
 
 ### 1) Is the API running?
 ```bash
 curl -i http://localhost:8000/health
 ```
 
-### 2) Is Postgres running and healthy?
+### 2) Is Postgres healthy?
 ```bash
 docker compose ps
 ```
 
-### 3) Do migrations match the DB?
+### 3) Are migrations applied?
 ```bash
-uv run alembic current
+make migrate
 ```
 
-### 4) Can the dashboard endpoints respond?
+### 4) Are the pipelines healthy?
 ```bash
-curl -i http://localhost:8000/dashboard/monthly
-curl -i "http://localhost:8000/dashboard/trend?start=2025-12-15&end=2026-01-14"
+make demo
+make clean
+make metrics
+make runs
 ```
+Common failures + fixes
+1) Address already in use (port 8000)
+Cause
 
-### 5) Look at logs
-- API logs: the terminal where uvicorn is running
-- Docker logs:
-```bash
-make logs
-```
+You started uvicorn twice (ex: make dev-all already runs the API, then you ran make run in another terminal).
 
----
+Fix
 
-## Database issues
+Stop one of them (CTRL+C), then run just one server.
 
-### Problem: Postgres won’t accept connections
-**Symptoms**
-- `connection refused`
-- `could not connect to server`
-- `timeout`
+### 2) DATABASE_URL is required (flags/clean/metrics)
 
-**Fix**
-```bash
-make db-up
-make db-wait
-```
-
-If it still fails:
-```bash
-docker compose ps
-make logs
-```
-
-Destructive reset (wipes DB volume):
-```bash
-make db-reset
-```
-
----
-
-### Problem: `psql` command fails with role/user errors (e.g. role "root" does not exist)
 **Cause**
-- You ran `psql` without passing the correct user/db, so it defaulted to your shell user.
+
+The CLI is running without environment exported.
 
 **Fix**
-Use the container env values:
+
 ```bash
-docker compose exec -T db bash -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+set -a
+source .env
+set +a
 ```
 
-Or connect from host with explicit values:
+Then:
+
 ```bash
-psql -h localhost -p 55432 -U d2d_user -d d2d_db
+make flags
+make clean
+make metrics
 ```
 
----
+### 3) RunTracker.succeed() got an unexpected keyword argument 'meta'
 
-## Migration issues
-
-### Problem: Alembic says `head` but tables are missing
 **Cause**
-- A migration can be applied (version advances) even if its `upgrade()` did nothing (no-op or empty).
+
+`RunTracker.succeed()` does not accept `meta=...` (meta belongs on the row).
 
 **Fix**
-Force re-run by downgrading then upgrading:
-```bash
-uv run alembic downgrade -1
-uv run alembic upgrade head
-```
 
-Verify schema:
-```bash
-psql -h localhost -p 55432 -U d2d_user -d d2d_db -c "\dt summary.*"
-```
+Update the pipeline to set `tracker.row.meta[...] = ...` then call `tracker.succeed()`.
 
----
+### 4) Metrics runner fails: Textual SQL expression ... should be explicitly declared as text(...)
 
-### Problem: Downgrade fails because an object is a VIEW vs TABLE
-**Symptoms**
-- `WrongObjectType ... is not a table`
-- hint says `Use DROP VIEW`
+**Cause**
+
+SQLAlchemy requires wrapping raw SQL strings.
 
 **Fix**
-Make downgrade robust in migration code:
+
+In [src/app/transform/__main__.py](src/app/transform/__main__.py):
+
+```python
+from sqlalchemy import text
+
+db.execute(text(stmt))
+```
+
+### 5) Metrics SQL fails: "monthly_metrics" is not a view
+
+**Cause**
+
+A previous version created `summary.monthly_metrics` as a TABLE or MATERIALIZED VIEW. `CREATE OR REPLACE VIEW` can't replace those.
+
+**Fix**
+
+In [src/app/transform/monthly_metrics.sql](src/app/transform/monthly_metrics.sql), drop all possible object types before creating the view:
+
 ```sql
-DROP VIEW IF EXISTS summary.monthly_metrics;
+DROP MATERIALIZED VIEW IF EXISTS summary.monthly_metrics;
 DROP TABLE IF EXISTS summary.monthly_metrics;
+DROP VIEW IF EXISTS summary.monthly_metrics;
 ```
 
-Then retry downgrade/upgrade.
+Then:
 
----
+```bash
+make metrics
+```
 
-## Import / module issues
+### 6) make metrics says SQL file missing / path issues
 
-### Problem: `ModuleNotFoundError: No module named 'app'`
 **Cause**
-- Repo uses `src/` layout and imports like `from app...`.
-- If `src` isn’t on `PYTHONPATH`, `app` can’t be resolved.
+
+Redirecting `< path.sql` inside a container doesn't work if the file is only on host. The fix is to run a small Python wrapper (`python -m app.transform`) that reads the file from host and executes it.
 
 **Fix**
-Use Makefile targets (they set `PYTHONPATH=src`) or run manually:
+
+Use the metrics runner module ([src/app/transform/__main__.py](src/app/transform/__main__.py)) and run:
+
 ```bash
-PYTHONPATH=src uv run uvicorn app.main:app --reload --env-file .env
+make metrics
 ```
 
----
+### 7) SQLAlchemy model error: MappedAnnotationError ... Python type object ... not resolvable
 
-### Problem: You accidentally used `scr` instead of `src`
-**Symptoms**
-- `ModuleNotFoundError: No module named 'scr'`
-
-**Fix**
-Use the correct module path:
-- `uvicorn app.main:app` with `PYTHONPATH=src`
-- (or) `uvicorn src.app.main:app` if you switch imports to `from src.app...`
-
----
-
-## Dashboard issues
-
-### Problem: `/dashboard` loads but `/dashboard/monthly` returns 500
-**Common causes**
-- Missing summary tables
-- API connected to the wrong database
-- SQL parameter typing errors
-
-**Fix**
-1) Confirm summary tables:
-```bash
-psql -h localhost -p 55432 -U d2d_user -d d2d_db -c "\dt summary.*"
-```
-
-2) Confirm API is loading `.env`:
-- run via Makefile or with:
-```bash
-PYTHONPATH=src uv run uvicorn app.main:app --reload --env-file .env
-```
-
-3) If error mentions `AmbiguousParameter`:
 **Cause**
-- Postgres can’t infer the type of NULL query params.
+
+A model column type annotation is too generic (ex: `Mapped[object]`) or missing a SQLAlchemy type mapping.
 
 **Fix**
-Cast optional params in SQL:
-```sql
-WHERE (CAST(:start AS date) IS NULL OR month_start >= CAST(:start AS date))
-  AND (CAST(:end AS date) IS NULL OR month_start < CAST(:end AS date))
-```
 
----
+Ensure mapped columns use concrete types (e.g. `Mapped[Decimal | None]` + proper SQLAlchemy column type).
 
-## “Nuke it from orbit” (last resort)
+## Nuke-from-orbit (last resort, dev only)
 
-If you want a clean slate (dev only, wipes DB):
+Wipes DB volume and starts fresh:
+
 ```bash
 docker compose down -v
 make dev-all
+make demo
+make clean
+make metrics
+make runs
 ```
-
----
-
-## Quick reference
-
-| Symptom | Likely cause | Fix |
-|---|---|---|
-| `role "root" does not exist` | wrong psql user | pass `-U` / use container `bash -lc` |
-| `No module named app` | src not on PYTHONPATH | `PYTHONPATH=src ...` |
-| `No module named scr` | typo | use `src` not `scr` |
-| Alembic head but missing tables | no-op migration | downgrade/upgrade |
-| Monthly endpoint 500 + AmbiguousParameter | NULL param typing | CAST params to date |

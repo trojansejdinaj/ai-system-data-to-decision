@@ -33,12 +33,7 @@ class IngestResult:
 
 
 def _parse_event_time(v: object) -> datetime:
-    """Best-effort parse to tz-aware UTC datetime.
-
-    We keep this intentionally strict-ish because the required schema contract
-    guarantees an event_time column. If parsing fails, we raise so we don't
-    silently write garbage keys that break dedupe.
-    """
+    """Best-effort parse to tz-aware UTC datetime."""
     if v is None:
         raise IngestionError("event_time is required")
 
@@ -48,7 +43,6 @@ def _parse_event_time(v: object) -> datetime:
         s = str(v).strip()
         if not s:
             raise IngestionError("event_time is required")
-        # common ISO case: 2026-01-05T06:00:00Z
         if s.endswith("Z"):
             s = s[:-1] + "+00:00"
         try:
@@ -142,6 +136,7 @@ def ingest_files(db: Session, source: str, files: list[tuple[str, bytes]]) -> In
         for filename, data in files:
             with tracker.step("parse", meta={"filename": filename}):
                 rows = _parse_by_extension(filename, data)
+
             per_file[filename] = len(rows)
             total += len(rows)
 
@@ -171,8 +166,14 @@ def ingest_files(db: Session, source: str, files: list[tuple[str, bytes]]) -> In
 
                 stmt = pg_insert(RawRecord.__table__).values(values)
                 stmt = stmt.on_conflict_do_nothing(index_elements=["source", "record_hash"])
+
+                # ✅ Reliable inserted count for ON CONFLICT DO NOTHING:
+                # RETURNING yields only rows that were actually inserted.
+                stmt = stmt.returning(RawRecord.__table__.c.id)
+
                 res = db.execute(stmt)
-                added = int(res.rowcount or 0)
+                added = len(res.fetchall())
+
                 inserted += added
                 deduped += len(values) - added
 

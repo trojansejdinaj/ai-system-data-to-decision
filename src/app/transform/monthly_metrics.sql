@@ -1,24 +1,51 @@
 /* ============================================================================
 monthly_metrics.sql
 
-Week 05 target:
-  Reproducible monthly metrics using CURRENT persisted tables.
+Week 05+ update:
+  Reproducible monthly metrics using SILVER (clean) layer as source of truth.
 
 Inputs:
-  - public.raw_records
+  - clean.clean_records   (silver)
 
 Outputs:
   - summary.monthly_metrics (view)
   - summary.data_quality_checks (table)  [optional but recommended]
 
 Notes:
-  - Month bucket uses event_time (timestamptz) in raw_records
+  - Month bucket uses event_time (timestamptz) in clean_records
+  - clean.clean_records may be deduped by (source, record_hash)
 ============================================================================ */
 
 -- 0) Schemas
 CREATE SCHEMA IF NOT EXISTS summary;
 
--- 1) Monthly metrics view (raw → summary)
+-- 1) Drop any existing monthly_metrics object safely (table/view/matview)
+DO $$
+DECLARE
+  kind char;
+BEGIN
+  SELECT c.relkind
+    INTO kind
+  FROM pg_class c
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE n.nspname = 'summary'
+    AND c.relname = 'monthly_metrics';
+
+  IF kind IS NULL THEN
+    -- nothing to drop
+    RETURN;
+  ELSIF kind = 'r' THEN
+    EXECUTE 'DROP TABLE summary.monthly_metrics';
+  ELSIF kind = 'v' THEN
+    EXECUTE 'DROP VIEW summary.monthly_metrics';
+  ELSIF kind = 'm' THEN
+    EXECUTE 'DROP MATERIALIZED VIEW summary.monthly_metrics';
+  ELSE
+    RAISE NOTICE 'summary.monthly_metrics exists with relkind=% (not dropped)', kind;
+  END IF;
+END $$;
+
+-- 2) Monthly metrics view (clean → summary)
 CREATE OR REPLACE VIEW summary.monthly_metrics AS
 WITH base AS (
   SELECT
@@ -27,8 +54,8 @@ WITH base AS (
     category,
     source_id,
     record_hash,
-    value
-  FROM public.raw_records
+    value_decimal
+  FROM clean.clean_records
   WHERE event_time IS NOT NULL
 )
 SELECT
@@ -48,7 +75,7 @@ FROM base
 GROUP BY 1
 ORDER BY 1;
 
--- 2) Data quality checks table (stores pass/fail results over time)
+-- 3) Data quality checks table (stores pass/fail results over time)
 CREATE TABLE IF NOT EXISTS summary.data_quality_checks (
   id bigserial PRIMARY KEY,
   check_name text NOT NULL,
@@ -61,16 +88,16 @@ CREATE TABLE IF NOT EXISTS summary.data_quality_checks (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
--- 3) Validation queries (run manually; copy/paste as needed)
+-- 4) Validation queries (run manually; copy/paste as needed)
 
 -- A) Inspect the monthly metrics
 -- SELECT * FROM summary.monthly_metrics ORDER BY month_start;
 
--- B) Control totals directly from raw_records (should match view totals)
+-- B) Control totals directly from clean_records (should match view totals)
 -- SELECT
 --   date_trunc('month', event_time)::date AS month_start,
---   COUNT(*) AS raw_count
--- FROM public.raw_records
+--   COUNT(*) AS clean_count
+-- FROM clean.clean_records
 -- WHERE event_time IS NOT NULL
 -- GROUP BY 1
 -- ORDER BY 1;
@@ -79,14 +106,14 @@ CREATE TABLE IF NOT EXISTS summary.data_quality_checks (
 -- SELECT
 --   s.month_start,
 --   s.total_records AS summary_count,
---   r.raw_count,
---   (s.total_records - r.raw_count) AS diff
+--   c.clean_count,
+--   (s.total_records - c.clean_count) AS diff
 -- FROM summary.monthly_metrics s
 -- JOIN (
 --   SELECT date_trunc('month', event_time)::date AS month_start,
---          COUNT(*) AS raw_count
---   FROM public.raw_records
+--          COUNT(*) AS clean_count
+--   FROM clean.clean_records
 --   WHERE event_time IS NOT NULL
 --   GROUP BY 1
--- ) r USING (month_start)
+-- ) c USING (month_start)
 -- ORDER BY s.month_start;

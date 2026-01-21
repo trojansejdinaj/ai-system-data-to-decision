@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
@@ -19,9 +18,16 @@ SAMPLES_DIR = Path(__file__).resolve().parents[3] / "data" / "samples"
 @router.post("/files")
 async def ingest_uploaded_files(
     db: Session = Depends(get_db),
-    files: Annotated[list[UploadFile], File(...)] | None = None,
+    # NOTE: don't combine Annotated(File(...)) with a default value.
+    # On newer FastAPI/Pydantic versions this can short-circuit to 422 before
+    # our handler runs, which breaks our contract (we want to return 400 for
+    # ingestion schema errors).
+    files: list[UploadFile] = File(...),
 ):
     try:
+        if not files:
+            raise HTTPException(status_code=400, detail="No files provided")
+
         payloads: list[tuple[str, bytes]] = []
         for f in files:
             payloads.append((f.filename or "unknown", await f.read()))
@@ -30,6 +36,8 @@ async def ingest_uploaded_files(
         return {
             "run_id": str(result.run_id),
             "total_records": result.total_records,
+            "inserted_records": result.inserted_records,
+            "deduped_records": result.deduped_records,
             "per_file": result.per_file,
         }
     except IngestionError as e:
@@ -47,6 +55,8 @@ def ingest_samples(db: Session = Depends(get_db)):
         return {
             "run_id": str(result.run_id),
             "total_records": result.total_records,
+            "inserted_records": result.inserted_records,
+            "deduped_records": result.deduped_records,
             "per_file": result.per_file,
         }
     except FileNotFoundError as e:

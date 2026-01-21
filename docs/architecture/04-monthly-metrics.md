@@ -1,56 +1,99 @@
-# Monthly metrics
+# Monthly Metrics (Gold)
 
-## Purpose
-Canonical monthly rollups used for reporting and later decision automation.
+## Output
+- **View:** `summary.monthly_metrics`
 
-## Source
-Input table:
-- `public.raw_records`
+## Input (source of truth)
+- **Table:** `clean.clean_records` (Silver)
 
-Output:
-- `summary.monthly_metrics` (**table**)
+Gold metrics are computed from the **silver** layer (clean data), not directly from raw ingestion.
 
-> Week 05 started with a view for iteration; Week 06 materialized into a table to support a stable dashboard snapshot and predictable performance.
+---
 
-## Time bucketing
-- `month_start = date_trunc('month', event_time)::date`
-
-## Metric definitions
-All metrics are computed per `month_start`:
+## What it contains
+For each month (`month_start` derived from `event_time`), the view provides:
 
 - `total_records`
-  - Definition: `COUNT(*)`
-  - Meaning: number of persisted raw records in that month
-
-- `distinct_records`
-  - Definition: `COUNT(DISTINCT (source, record_hash))`
-  - Meaning: unique records by stable hash **within a source**; matches the DB dedupe constraint on `(source, record_hash)`
-
+- `distinct_records` (by `record_hash`)
 - `distinct_source_ids`
-  - Definition: `COUNT(DISTINCT source_id)`
-  - Meaning: unique upstream identifiers observed
-
 - `distinct_sources`
-  - Definition: `COUNT(DISTINCT source)`
-  - Meaning: number of distinct ingestion sources contributing data
-
 - `distinct_categories`
-  - Definition: `COUNT(DISTINCT category)`
-  - Meaning: number of distinct categories observed
 
-## Relationship to daily metrics
-Daily rollups follow the same definitions and power the trend chart:
-- `summary.daily_metrics` (table)
+> Note: because `clean.clean_records` is deduped by `(source, record_hash)`, totals may be lower than raw ingestion totals.
 
-Monthly metrics are derived from `raw_records` directly (not from daily) to keep the definition unambiguous.
+---
 
-## Indexing
-Primary key:
-- `month_start`
+## Refresh mechanism (tracked)
 
-Recommended index:
-- `month_start` (for ordered reads and range filters)
+A small runner applies the SQL file and records a pipeline run:
 
-## Notes
-- These metrics are intended as *control totals* and simple dashboard KPIs, not as a full analytics model.
-- If the pipeline later introduces “soft deletes” or late-arriving updates, consider recomputing monthly snapshots and recording validation checks in `summary.data_quality_checks`.
+- SQL definition: [src/app/transform/monthly_metrics.sql](src/app/transform/monthly_metrics.sql)
+- Runner: `python -m app.transform` (wired to `make metrics`)
+- Run tracking: `pipeline_runs.pipeline = "metrics"`
+
+**Run it:**
+
+```bash
+make metrics
+```
+
+**This ensures:**
+
+- `summary` schema exists
+- `summary.data_quality_checks` table exists (optional tracking)
+- `summary.monthly_metrics` exists as a VIEW (recreated deterministically)
+
+## Implementation notes
+
+### Idempotency / object type safety
+
+If `summary.monthly_metrics` ever existed as a TABLE or MATERIALIZED VIEW in older iterations, the SQL file should drop those before creating the VIEW, e.g.:
+
+```sql
+DROP MATERIALIZED VIEW IF EXISTS summary.monthly_metrics;
+DROP TABLE IF EXISTS summary.monthly_metrics;
+DROP VIEW IF EXISTS summary.monthly_metrics;
+```
+
+This prevents "monthly_metrics" is not a view errors when refreshing.
+
+## Validation
+
+### Inspect the gold output
+
+```sql
+SELECT * FROM summary.monthly_metrics ORDER BY month_start;
+```
+
+### Validate totals against silver
+
+```sql
+SELECT
+  date_trunc('month', event_time)::date AS month_start,
+  COUNT(*) AS clean_count
+FROM clean.clean_records
+WHERE event_time IS NOT NULL
+GROUP BY 1
+ORDER BY 1;
+```
+
+**Expected (for sample data):**
+
+- one month row
+- `total_records = 10` (after clean upsert)
+
+## Observability
+
+After running `make metrics`, confirm a tracked run exists:
+
+```bash
+make runs
+```
+
+You should see a recent:
+
+```
+metrics | succeeded
+```
+
+with step details for `apply_sql`.

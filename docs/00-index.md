@@ -12,6 +12,7 @@ This folder contains documentation for the `ai-system-data-to-decision` portfoli
 - Monthly metrics definitions: `docs/architecture/04-monthly-metrics.md`
 - Week 06 dashboard v1: `docs/architecture/05-dashboard-v1.md`
 - Week 08 reliability (run tracking + structured logs): `docs/architecture/06-reliability-run-tracking.md`
+- Week 09 silver layer (clean.clean_records): `docs/architecture/07-silver-layer-clean-records.md`
 
 ## Runbooks
 - Local dev workflow: `docs/runbooks/local-dev.md`
@@ -31,6 +32,7 @@ This folder contains documentation for the `ai-system-data-to-decision` portfoli
 - 0009: Dashboard v1 + summary tables: `docs/decisions/0009-dashboard-v1-summary-tables.md`
 - 0010: Exceptions/flags v1: `docs/decisions/0010-exceptions-flags-v1.md`
 - 0011: Reliability: run tracking + structured logs: `docs/decisions/0011-reliability-run-tracking.md`
+- 0012: Silver layer + metrics refresh runner: `docs/decisions/0012-silver-layer-and-metrics-refresh.md`
 
 ## Changelog
 - Week 01: `docs/changelog/week-01.md`
@@ -41,9 +43,11 @@ This folder contains documentation for the `ai-system-data-to-decision` portfoli
 - Week 06: `docs/changelog/week-06.md`
 - Week 07: `docs/changelog/week-07.md`
 - Week 08: `docs/changelog/week-08.md`
+- Week 09: `docs/changelog/week-09.md`
 
 ## Evidence
 - Week 05: `docs/assets/week-05/`
 - Week 06: `docs/assets/week-06/`
 - Week 07: `docs/assets/week-07/`
 - Week 08: `docs/assets/week-08/`
+- Week 09: `docs/assets/week-09/`

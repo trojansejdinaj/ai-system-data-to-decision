@@ -1,202 +1,257 @@
-# ai-system-data-to-decision
+````md
+# AI System: Data-to-Decision (Portfolio)
 
-**Status:** ingestion + cleaning + idempotent DB persistence (Week 04).  
-This repo is the flagship “data → decision” portfolio project: a production-style backbone for ingesting raw data, storing it, transforming it, training models, and serving decisions via APIs.
+A minimal, end-to-end data pipeline that turns messy source files into decision-ready metrics — with **ingestion**, **cleaning/normalization**, **transform layer**, a **dashboard**, **flags (exceptions)**, and **reliability run tracking** (structured logs + persisted pipeline run records).
 
-Right now it’s intentionally small and correct: FastAPI + Postgres + migrations + tests + a clean dev workflow —
-plus ingestion v1, deterministic cleaning rules, and DB-enforced dedupe.
-
----
-
-## What it can do today
-
-- Run a FastAPI app with a health endpoint: `GET /health → {"status":"ok"}`
-- Run Postgres 16 locally via Docker Compose (default host port **55432**)
-- Manage dependencies with **uv** + `pyproject.toml` + `uv.lock`
-- Run Alembic migrations via `make migrate` (with a DB readiness wait)
-- Lint/format/test with one-liner Make targets
-
-- Ingest CSV/XLSX:
-  - `POST /ingest/samples` (loads `data/samples/`)
-  - `POST /ingest/files` (multipart upload)
-- Persist ingestion runs + raw records in Postgres
-- Enforce idempotency (no duplicate raw rows) via DB unique constraint + upsert
-- Cleaning + normalization module (`app.cleaning`) with unit tests
-
-> Models/feature engineering/decision logic are not built yet — this is the foundation + ingestion + raw staging layer.
+**Status:** ✅ Weeks 01–08 complete (scaffold → ingest → clean → DB → transforms → dashboard → flags → run tracking)
 
 ---
 
-## Quickstart
+## What it can do today (end-to-end)
 
-### Prereqs
-- Python **3.12+**
-- `uv`
-- Docker + Docker Compose
+### Ingest (Bronze)
+- Load sample **CSV/Excel** sources into a raw schema/table (idempotent-ish for local dev)
+- Validate environment + DB readiness before running
 
-### 1) Install deps
+### Clean + Normalize
+- Normalize key fields (dates, amounts, category mapping, source fields)
+- Enforce consistent record shape so downstream transforms are stable
+- Unit-tested cleaning rules
+
+### Transform (Gold / Summary)
+- Build monthly rollups/metrics (e.g., totals, distinct counts) in a summary schema/table/view
+- Queryable from API endpoints used by the dashboard
+
+### Dashboard (FastAPI)
+- Serve a simple dashboard UI + JSON endpoints for charts/metrics
+- Shows monthly metrics and trends computed from the transform layer
+
+### Flags (Exceptions / Needs-attention)
+- Run a “flags” pass to detect suspicious or invalid records
+- Writes a CSV report under `docs/assets/week-07/` (portfolio proof artifact)
+
+### Reliability: structured logs + run tracking
+- Emits structured logs (JSON-like) with trace IDs
+- Persists each pipeline execution into a `pipeline_runs` table (status, timestamps, duration, counts)
+
+---
+
+## 2-minute demo (portfolio proof)
+
+### 1) Bring up DB + migrate + run API
 ```bash
-make sync
+make dev-all
 ```
 
-### 2) Configure env
-Create a real `.env` from the template and set your DB password:
+### 2) Ingest sample files (CSV + XLSX)
+
 ```bash
-cp .env.example .env
-# edit .env and set POSTGRES_PASSWORD + DATABASE_URL
+curl -X POST http://localhost:8000/ingest/samples
 ```
 
-### 3) Start Postgres
+### 3) Open the dashboard
+
+* [http://localhost:8000/dashboard](http://localhost:8000/dashboard)
+
+### 4) Generate the flags report (writes CSV + tracks the run)
+
 ```bash
-make db-up
+# In a second terminal:
+PYTHONPATH=src uv run python -m app.flags
+# (If your repo provides a CLI entrypoint, use that instead.)
 ```
 
-### 4) Run migrations
-```bash
-make migrate
-```
+### 5) Proof query: check persisted run tracking
 
-### 5) Run the API
 ```bash
-make run
-```
-
-Then verify:
-```bash
-curl http://localhost:8000/health
+docker compose exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
+"SELECT pipeline, status, duration_ms, started_at FROM pipeline_runs ORDER BY started_at DESC LIMIT 10;"
 ```
 
 ---
 
-## Common commands
+## Why this exists (portfolio intent)
 
-| Task | Command |
-|------|---------|
-| Install/sync deps | `make sync` |
-| Format | `make fmt` |
-| Lint (auto-fix) | `make lint` |
-| Run tests | `make test` |
-| Start API | `make run` |
-| Start DB | `make db-up` |
-| Stop DB | `make db-down` |
-| Tail DB logs | `make logs` |
-| Wait for DB | `make db-wait` |
-| Apply migrations | `make migrate` |
-| Create migration | `make revision m="your message"` |
+This repo is a clean “systems” demonstration:
+
+* You can ingest imperfect real-world files
+* Normalize them into a consistent model
+* Produce decision-ready rollups (monthly metrics)
+* Expose them through an API/dashboard
+* Detect exceptions (flags) and produce an artifact report
+* Track and audit pipeline executions (run tracking)
+
+If you want to hire someone to build practical pipelines and dashboards with reliability baked in, this is the type of work.
 
 ---
 
-## Configuration
+## Tech stack
+
+* Python + FastAPI
+* Postgres (Docker Compose)
+* Alembic migrations
+* Pytest
+* `uv` for env + dependency management
+* Makefile for repeatable local workflows
+
+---
+
+## Project structure
+
+```text
+src/
+  app/
+    api/                # FastAPI routes (dashboard, ingest, etc.)
+    db/                 # DB session, models, migrations integration
+    flags/              # Flags pipeline (exceptions report)
+    ingest/             # Ingestion pipeline (CSV/XLSX)
+    transform/          # Monthly metrics / summary transforms
+    observability/      # structured logs + run tracking helpers (if present)
+docs/
+  00-index.md           # docs entry point
+  architecture/         # architecture notes per week/module
+  decisions/            # ADRs
+  changelog/            # weekly changelogs
+  assets/
+    week-07/            # flags report CSV proof artifacts
+    week-08/            # screenshots for logs/run tracking/dashboard
+tests/                  # unit/integration tests
+docker-compose.yml      # Postgres for local dev
+Makefile                # one-command workflows
+```
+
+---
+
+## Setup
+
+### Requirements
+
+* Docker + Docker Compose
+* Python (managed via `uv`)
+* Optional: `psql` client (or use `docker compose exec`)
 
 ### Environment variables
-Local config is driven by `.env` (gitignored) and `.env.example` (committed).
 
-Key vars:
-- `POSTGRES_DB` (default: `d2d_db`)
-- `POSTGRES_USER` (default: `d2d_user`)
-- `POSTGRES_PASSWORD` (**required**)
-- `POSTGRES_PORT` (default: **55432**)
-- `DATABASE_URL` (used by app + Alembic)
+Copy the example env file and adjust if needed:
 
-Example (`.env.example`):
-```env
-POSTGRES_DB=d2d_db
-POSTGRES_USER=d2d_user
-POSTGRES_PASSWORD=__SET_IN_.ENV__
-POSTGRES_PORT=55432
-
-DATABASE_URL=postgresql+psycopg://d2d_user:__SET_IN_.ENV__@localhost:55432/d2d_db
+```bash
+cp .env.example .env
 ```
+
+Common variables:
+
+* `DATABASE_URL` (or individual `POSTGRES_*` variables used by compose)
+* `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`
 
 ---
 
-## Database + migrations
+## Local development
 
-- Postgres runs as a Docker service named `db`.
-- Alembic is configured at `alembic.ini` and runs migrations from `src/app/db/migrations`.
+### Bring everything up
 
-Apply migrations:
+```bash
+make dev-all
+```
+
+### Run migrations
+
 ```bash
 make migrate
 ```
 
-Create a migration:
+### Run tests
+
 ```bash
-make revision m="add_events_table"
+make test
 ```
 
-### Note about autogenerate
-`alembic/env.py` is wired to `Base.metadata`, so `alembic revision --autogenerate` can detect model changes.
+### Run lint/format (if configured)
 
-### Note about dotenv
-`alembic/env.py` uses `python-dotenv` (`from dotenv import load_dotenv`).
-This repo includes it in `pyproject.toml` so migrations can load `.env` for local development.
-
----
-
-## Project layout (current)
-
-Typical structure:
-```
-.
-├── src/
-│   └── app/
-│       ├── main.py
-│       ├── api/
-│       │   └── ingest.py
-│       ├── ingestion/
-│       │   └── service.py
-│       ├── cleaning/
-│       │   ├── pipeline.py
-│       │   └── rules.py
-│       ├── core/
-│       │   └── config.py
-│       └── db/
-│           ├── models.py
-│           ├── session.py
-│           └── migrations/
-├── tests/
-│   ├── test_health.py
-│   ├── test_ingest.py
-│   └── test_cleaning_rules.py
-├── data/
-│   └── samples/
-│       ├── sample.csv
-│       └── sample.xlsx
-├── docker-compose.yml
-├── alembic.ini
-├── pyproject.toml
-└── Makefile
+```bash
+make lint
 ```
 
 ---
 
-## Docs
+## Key API endpoints
 
-See `docs/` for:
-- Runbooks (local dev, DB, migrations, troubleshooting)
-- ADRs (architecture decisions)
-- Changelog
+> Exact routes may vary slightly depending on the final implementation; check `src/app/api/` if needed.
 
-Start at: `docs/00-index.md`
+* `POST /ingest` — ingest default/sample inputs
+* `POST /ingest/samples` — ingest bundled samples (recommended for demo)
+* `GET /dashboard` — dashboard UI
+* `GET /dashboard/monthly` — monthly metrics (JSON)
+* `GET /dashboard/trend` — trend view (JSON)
 
 ---
 
-## Roadmap (next milestones)
+## Outputs / proof artifacts
 
-1) **Persist cleaned rows (silver table)**
-   - Run `app.cleaning` before persistence into a new `clean_records` table
-   - Keep raw → clean lineage + replay
+* Flags report CSV:
 
-2) **Transform + feature layer (gold tables)**
-   - Aggregations, time windows, and feature snapshots
-   - Tests for deterministic transforms
+  * `docs/assets/week-07/flags_report.csv` (or similarly named)
+* Week 08 screenshots:
 
-3) **Decision API**
-   - Start with rules/scoring
-   - Add model serving once data volume + stability exist
+  * `docs/assets/week-08/01-structured-logs.png`
+  * `docs/assets/week-08/02-pipeline-runs-table.png`
+
+---
+
+## Reliability: run tracking
+
+Each pipeline execution writes a row to `pipeline_runs`, capturing:
+
+* pipeline name (e.g., ingest / transform / flags)
+* status (success/failure)
+* timestamps + duration
+* record counts (if captured)
+* trace ID (if wired through)
+
+This gives you auditability and makes it obvious when something breaks.
+
+---
+
+## Docs map
+
+Start here:
+
+* `docs/00-index.md`
+
+Architecture and decisions:
+
+* `docs/architecture/`
+* `docs/decisions/`
+
+Weekly timeline:
+
+* `docs/changelog/`
+
+---
+
+## Roadmap (next steps to make it “production-ish”)
+
+If you want to push this from “portfolio pipeline” to “mini production system”:
+
+1. **Silver layer table**
+
+   * Persist cleaned/normalized records in a `clean.*` schema/table
+   * Keep raw (bronze) immutable; rebuild clean deterministically
+
+2. **Deterministic refresh job**
+
+   * Add a single command to rebuild transforms end-to-end
+   * Example: `uv run python -m app.refresh` (and track the run)
+
+3. **Request-level tracing**
+
+   * Middleware that attaches request IDs and propagates them into pipeline runs/logs
+
+4. **CI**
+
+   * GitHub Actions: lint + unit tests + integration tests using a Postgres service
 
 ---
 
 ## License
-MIT (see `LICENSE`)
+
+See `LICENSE`.

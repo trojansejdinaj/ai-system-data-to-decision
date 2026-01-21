@@ -9,7 +9,6 @@ from typing import Any
 import pytest
 from sqlalchemy import create_engine, text
 
-
 pytestmark = pytest.mark.integration
 
 
@@ -32,7 +31,9 @@ def _build_database_url_from_env() -> str | None:
 
 
 def _db_engine():
-    database_url = os.getenv("DATABASE_URL") or os.getenv("DB_URL") or _build_database_url_from_env()
+    database_url = (
+        os.getenv("DATABASE_URL") or os.getenv("DB_URL") or _build_database_url_from_env()
+    )
     if not database_url:
         pytest.skip(
             "No DATABASE_URL/DB_URL and missing POSTGRES_USER/POSTGRES_PASSWORD/POSTGRES_DB; "
@@ -72,7 +73,10 @@ def test_flags_writes_pipeline_run_row(tmp_path):
     # Run the real pipeline via module entrypoint.
     # We force output into tmp_path to avoid touching docs/assets.
     env = os.environ.copy()
-    env.setdefault("DATABASE_URL", os.getenv("DATABASE_URL") or os.getenv("DB_URL") or _build_database_url_from_env() or "")
+    env.setdefault(
+        "DATABASE_URL",
+        os.getenv("DATABASE_URL") or os.getenv("DB_URL") or _build_database_url_from_env() or "",
+    )
     env["FLAGS_LIMIT"] = "10"
     env["FLAGS_REPORT_PATH"] = str(tmp_path / "flags_report.csv")
 
@@ -83,13 +87,16 @@ def test_flags_writes_pipeline_run_row(tmp_path):
         text=True,
     )
 
-    assert proc.returncode == 0, f"flags pipeline failed:\nSTDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
+    assert proc.returncode == 0, (
+        f"flags pipeline failed:\nSTDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
+    )
 
     # Fetch the newest flags run row created after `before`
     with engine.connect() as conn:
-        row: dict[str, Any] | None = conn.execute(
-            text(
-                """
+        row: dict[str, Any] | None = (
+            conn.execute(
+                text(
+                    """
                 SELECT pipeline, status, duration_ms, steps, error_type, error_message, started_at
                 FROM pipeline_runs
                 WHERE pipeline = 'flags'
@@ -97,13 +104,18 @@ def test_flags_writes_pipeline_run_row(tmp_path):
                 ORDER BY started_at DESC
                 LIMIT 1
                 """
-            ),
-            {"before": before},
-        ).mappings().first()
+                ),
+                {"before": before},
+            )
+            .mappings()
+            .first()
+        )
 
     assert row is not None, "Expected a new pipeline_runs row for pipeline='flags'"
 
-    assert row["status"] == "succeeded", f"Expected succeeded, got: {row['status']} ({row.get('error_message')})"
+    assert row["status"] == "succeeded", (
+        f"Expected succeeded, got: {row['status']} ({row.get('error_message')})"
+    )
     assert row["duration_ms"] is not None and row["duration_ms"] >= 0
 
     steps = row["steps"]

@@ -1,16 +1,20 @@
 # Local Development Runbook
 
-This repo runs a **FastAPI** API server backed by a **Postgres** database (Docker Compose).  
-Week 06 adds a **Dashboard v1** at `/dashboard` with DB-backed summary endpoints.
+This repo runs a **FastAPI** API server backed by a **Postgres** database (Docker Compose).
+It also includes a small pipeline stack:
+
+- **Bronze:** `public.raw_records` (ingestion)
+- **Silver:** `clean.clean_records` (cleaning)
+- **Gold:** `summary.monthly_metrics` (transform view)
+- **Reliability:** `pipeline_runs` run tracking + structured logs
 
 ---
 
 ## Prerequisites
-
 - Python **3.12+**
-- **uv** installed
+- **uv**
 - Docker + Docker Compose
-- (Optional) `psql` installed locally for DB access
+- (Optional) `psql` locally
 
 ---
 
@@ -21,31 +25,56 @@ Week 06 adds a **Dashboard v1** at `/dashboard` with DB-backed summary endpoints
 make sync
 ```
 
-### 2) Create `.env`
+### 2) Create .env
 ```bash
 cp .env.example .env
 ```
 
-Fill in the values (DB user/password/db name/ports). Never commit `.env`.
+Fill in DB creds (at minimum POSTGRES_PASSWORD) and set DATABASE_URL.
 
----
-
-## One-command dev bring-up (recommended)
-
+### 3) One-command dev bring-up (recommended)
 ```bash
 make dev-all
 ```
 
-`dev-all` does:
-- `docker compose up -d` (starts Postgres)
+**What dev-all does:**
+
+- docker compose up -d (start Postgres)
 - waits for DB readiness
-- `alembic upgrade head` (migrations)
-- starts FastAPI via uvicorn with `--reload`
+- alembic upgrade head (apply migrations)
+- starts FastAPI via uvicorn with --reload
 
-Open:
-- Dashboard UI: `http://localhost:8000/dashboard`
+**Open:**
 
----
+- Dashboard UI: http://localhost:8000/dashboard
+
+## Portfolio demo flow
+
+**Option A: one-liner demo**
+```bash
+make demo
+```
+
+**What demo does (conceptually):**
+
+- Ingest sample CSV/XLSX into raw_records
+- Run flags report (writes CSV)
+- Print latest pipeline runs
+
+**Option B: step-by-step**
+```bash
+make demo-ingest
+make flags
+make clean
+make metrics
+make runs
+```
+
+**Expected outputs:**
+
+- Flags CSV: docs/assets/week-07/flags_report.csv
+- Monthly metrics: queryable via summary.monthly_metrics
+- Run tracking: make runs
 
 ## Common commands
 
@@ -86,101 +115,91 @@ make test
 make logs
 ```
 
----
+## Pipelines
 
-## Dashboard v1 (Week 06)
+### Ingestion (Bronze)
 
-### UI
-- `GET /dashboard`  
-  Browser: `http://localhost:8000/dashboard`
+**Endpoint:** `POST /ingest/samples`
 
-### API (JSON)
-- `GET /dashboard/monthly`  
-  Optional query params: `start` (inclusive), `end` (exclusive)
+**Tables:**
 
-- `GET /dashboard/trend`  
-  Required: `start`, `end`  
-  Optional: `granularity=day|week|month`, `metric=total_records|distinct_records|distinct_source_ids|distinct_sources|distinct_categories`
+- public.ingest_runs
+- public.raw_records
 
-Examples:
+**Example:**
 ```bash
-curl -s http://localhost:8000/dashboard/monthly
-
-curl -s "http://localhost:8000/dashboard/trend?start=2025-12-15&end=2026-01-14&granularity=day&metric=total_records"
+curl -s -X POST http://localhost:8000/ingest/samples | python -m json.tool
 ```
 
----
+### Flags (Exceptions)
+```bash
+make flags
+```
+
+**Produces:**
+
+- docs/assets/week-07/flags_report.csv
+- a pipeline_runs row with step-level metadata
+
+### Cleaning (Silver)
+```bash
+make clean
+```
+
+**Upserts into:**
+
+- clean.clean_records
+
+### Metrics refresh (Gold view)
+```bash
+make metrics
+```
+
+**Creates/refreshes:**
+
+- summary.monthly_metrics (VIEW)
+- summary.data_quality_checks (TABLE)
 
 ## Database access
 
-### Option A: connect from host (recommended)
-If Postgres is exposed on port **55432**:
+**Option A: connect from host**
 ```bash
 psql -h localhost -p 55432 -U d2d_user -d d2d_db
 ```
 
-### Option B: connect inside the container
+**Option B: connect inside the container**
 ```bash
 docker compose exec -T db bash -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
 ```
 
-Why `bash -lc`?
-- it expands `$POSTGRES_USER` / `$POSTGRES_DB` **inside** the container where those env vars exist.
+## Troubleshooting
 
----
+### Port already in use (Address already in use)
 
-## Quick verification checklist
+If you ran `make dev-all` and then also ran `make run` in another terminal, you'll collide on port 8000.
 
-### 1) API is up
-```bash
-curl -i http://localhost:8000/health
-```
+**Fix options:**
 
-### 2) Summary tables exist
-Inside `psql`:
-```sql
-\dt summary.*
-```
+- stop the old uvicorn (CTRL+C in the terminal that started it), OR
+- run only one server process, OR
+- change the port in the `make run` command if you really need two
 
-You should see:
-- `summary.daily_metrics`
-- `summary.monthly_metrics`
+### DATABASE_URL is required when running flags/clean/metrics
 
-### 3) Dashboard endpoints return 200
-```bash
-curl -i http://localhost:8000/dashboard/monthly
-curl -i "http://localhost:8000/dashboard/trend?start=2025-12-15&end=2026-01-14"
-```
+Your pipeline CLIs need DB access.
 
----
-
-## Troubleshooting (fast)
-
-### `ModuleNotFoundError: No module named 'app'`
-This repo uses `src/` layout and imports like `from app...`.  
-Run via Makefile (it sets `PYTHONPATH=src`) or run manually:
+**Fix (quick):**
 
 ```bash
-PYTHONPATH=src uv run uvicorn app.main:app --reload --env-file .env
+set -a
+source .env
+set +a
 ```
 
-### `/dashboard/monthly` 500 with `AmbiguousParameter`
-Cause: optional `start/end` passed as NULL without typed casting.  
-Fix: cast params to `date` in SQL (e.g. `CAST(:start AS date)`).
+Then re-run:
 
----
-
-## Command reference
-
-| Command | What it does |
-|---|---|
-| `make dev-all` | Start DB, migrate, run API |
-| `make run` | Run API with reload |
-| `make db-up` | Start Postgres |
-| `make db-down` | Stop containers |
-| `make db-reset` | Destroy DB volume + recreate |
-| `make migrate` | Apply migrations |
-| `make revision m="..."` | Create migration |
-| `make lint` | Ruff check/fix |
-| `make test` | Pytest |
-| `make logs` | Docker logs |
+```bash
+make flags
+make clean
+make metrics
+```

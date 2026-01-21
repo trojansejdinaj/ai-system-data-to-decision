@@ -13,6 +13,7 @@ from app.observability.run_tracking import RunTracker
 
 class FakeSession:
     """Unit-test DB session: no real database, just records calls."""
+
     def __init__(self):
         self.added = []
         self.flushed = 0
