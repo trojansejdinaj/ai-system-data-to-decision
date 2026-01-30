@@ -15,6 +15,7 @@ This folder contains documentation for the `ai-system-data-to-decision` portfoli
 - Week 09 silver layer (clean.clean_records): `docs/architecture/07-silver-layer-clean-records.md`
 
 ## Runbooks
+- Demo (golden path): `docs/runbooks/demo.md`
 - Local dev workflow: `docs/runbooks/local-dev.md`
 - Database: `docs/runbooks/database.md`
 - Migrations: `docs/runbooks/migrations.md`
@@ -33,6 +34,7 @@ This folder contains documentation for the `ai-system-data-to-decision` portfoli
 - 0010: Exceptions/flags v1: `docs/decisions/0010-exceptions-flags-v1.md`
 - 0011: Reliability: run tracking + structured logs: `docs/decisions/0011-reliability-run-tracking.md`
 - 0012: Silver layer + metrics refresh runner: `docs/decisions/0012-silver-layer-and-metrics-refresh.md`
+- 0013: Demo as golden path: `docs/decisions/0013-demo-golden-path.md`
 
 ## Changelog
 - Week 01: `docs/changelog/week-01.md`
@@ -44,6 +46,7 @@ This folder contains documentation for the `ai-system-data-to-decision` portfoli
 - Week 07: `docs/changelog/week-07.md`
 - Week 08: `docs/changelog/week-08.md`
 - Week 09: `docs/changelog/week-09.md`
+- Week 10: `docs/changelog/week-10.md`
 
 ## Evidence
 - Week 05: `docs/assets/week-05/`

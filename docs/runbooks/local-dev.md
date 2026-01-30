@@ -32,6 +32,16 @@ cp .env.example .env
 
 Fill in DB creds (at minimum POSTGRES_PASSWORD) and set DATABASE_URL.
 
+**Option: Use direnv instead (or alongside)**
+
+Create `.envrc` to auto-load .env:
+```bash
+echo 'dotenv' > .envrc
+direnv allow
+```
+
+✅ **Note:** `.env` stays gitignored; `.envrc` is safe to commit.
+
 ### 3) One-command dev bring-up (recommended)
 ```bash
 make dev-all
@@ -50,31 +60,32 @@ make dev-all
 
 ## Portfolio demo flow
 
-**Option A: one-liner demo**
+**The golden path (T1 DoD):**
 ```bash
 make demo
 ```
 
-**What demo does (conceptually):**
+**What demo does (in order):**
 
-- Ingest sample CSV/XLSX into raw_records
-- Run flags report (writes CSV)
-- Print latest pipeline runs
+1. `make db-up` — start Postgres container
+2. `make migrate` — apply latest migrations
+3. `make ingest-samples` — run CLI ingestion (no API needed)
+4. `make flags` — run exceptions/flags engine
+5. Print latest pipeline_runs (5 rows)
+6. Print record counts (raw_records, ingest_runs)
+7. Exit with success banner
 
-**Option B: step-by-step**
+**Prove idempotency: run it twice**
 ```bash
-make demo-ingest
-make flags
-make clean
-make metrics
-make runs
+make demo
+make demo  # run again immediately
 ```
 
-**Expected outputs:**
-
-- Flags CSV: docs/assets/week-07/flags_report.csv
-- Monthly metrics: queryable via summary.monthly_metrics
-- Run tracking: make runs
+**Expected on run #2:**
+- `inserted_records: 0` (samples already in DB)
+- `deduped_records: 20` (recognizes duplicates)
+- `raw_records` stays at 10 rows (deduplication working)
+- Both pipeline_runs appear in the output
 
 ## Common commands
 
@@ -119,17 +130,21 @@ make logs
 
 ### Ingestion (Bronze)
 
-**Endpoint:** `POST /ingest/samples`
+**CLI (used by `make demo`):**
+```bash
+make ingest-samples
+```
+✅ Does **not** require FastAPI running. Used in the golden path.
 
 **Tables:**
-
 - public.ingest_runs
 - public.raw_records
 
-**Example:**
+**Alternative: API endpoint (requires `make run` in another terminal)**
 ```bash
 curl -s -X POST http://localhost:8000/ingest/samples | python -m json.tool
 ```
+Or via the dashboard UI.
 
 ### Flags (Exceptions)
 ```bash
@@ -188,17 +203,27 @@ If you ran `make dev-all` and then also ran `make run` in another terminal, you'
 
 Your pipeline CLIs need DB access.
 
-**Fix (quick):**
+**Fix (preferred): direnv**
+
+```bash
+echo 'dotenv' > .envrc
+direnv allow
+```
+
+Then re-run in the same shell:
+
+```bash
+make flags
+make clean
+make metrics
+```
+
+**Fix (fallback): manual env load**
 
 ```bash
 set -a
 source .env
 set +a
-```
-
-Then re-run:
-
-```bash
 make flags
 make clean
 make metrics

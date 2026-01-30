@@ -31,6 +31,8 @@ make migrate
 
 This runs all pending migrations against the database.
 
+⚠️ **Reliability Note:** The Makefile runs Alembic via Python module (`uv run python -m alembic`), not as a binary on `$PATH`. This avoids `Failed to spawn: alembic` errors from missing or stale installations. Always use `make migrate` / `make revision` in this project.
+
 ---
 
 ## Creating Migrations

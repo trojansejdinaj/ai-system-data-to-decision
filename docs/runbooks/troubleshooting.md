@@ -28,8 +28,12 @@ make clean
 make metrics
 make runs
 ```
-Common failures + fixes
-1) Address already in use (port 8000)
+
+---
+
+## Common failures + fixes
+
+### 1) Address already in use (port 8000)
 Cause
 
 You started uvicorn twice (ex: make dev-all already runs the API, then you ran make run in another terminal).
@@ -44,15 +48,15 @@ Stop one of them (CTRL+C), then run just one server.
 
 The CLI is running without environment exported.
 
-**Fix**
+**Fix (preferred): direnv**
 
 ```bash
-set -a
-source .env
-set +a
+echo 'dotenv' > .envrc
+direnv allow
+direnv status  # confirm it's active
 ```
 
-Then:
+Then in a fresh shell:
 
 ```bash
 make flags
@@ -60,7 +64,35 @@ make clean
 make metrics
 ```
 
-### 3) RunTracker.succeed() got an unexpected keyword argument 'meta'
+**Fix (fallback): manual env load**
+
+```bash
+set -a
+source .env
+set +a
+make flags
+make clean
+make metrics
+```
+
+### 3) Failed to spawn: alembic (os error 2)
+
+**Cause**
+
+Alembic console script not found in `$PATH`. The alembic binary is not installed or not available in the run context.
+
+**Fix**
+
+Always use the module invocation via `make migrate` / `make revision` (they run `uv run python -m alembic`), and ensure you've run `uv sync`:
+
+```bash
+uv sync
+make migrate
+```
+
+Do **not** call `alembic` directly as a binary.
+
+### 4) RunTracker.succeed() got an unexpected keyword argument 'meta'
 
 **Cause**
 
@@ -70,7 +102,7 @@ make metrics
 
 Update the pipeline to set `tracker.row.meta[...] = ...` then call `tracker.succeed()`.
 
-### 4) Metrics runner fails: Textual SQL expression ... should be explicitly declared as text(...)
+### 5) Metrics runner fails: Textual SQL expression ... should be explicitly declared as text(...)
 
 **Cause**
 
@@ -86,7 +118,7 @@ from sqlalchemy import text
 db.execute(text(stmt))
 ```
 
-### 5) Metrics SQL fails: "monthly_metrics" is not a view
+### 6) Metrics SQL fails: "monthly_metrics" is not a view
 
 **Cause**
 
@@ -108,7 +140,7 @@ Then:
 make metrics
 ```
 
-### 6) make metrics says SQL file missing / path issues
+### 7) make metrics says SQL file missing / path issues
 
 **Cause**
 
@@ -122,7 +154,7 @@ Use the metrics runner module ([src/app/transform/__main__.py](src/app/transform
 make metrics
 ```
 
-### 7) SQLAlchemy model error: MappedAnnotationError ... Python type object ... not resolvable
+### 8) SQLAlchemy model error: MappedAnnotationError ... Python type object ... not resolvable
 
 **Cause**
 

@@ -70,7 +70,8 @@ def main() -> None:
             for fr in flagged[:10]:
                 r = fr.record
                 print(
-                    f"  {fr.severity:3d} | {r.get('id', '')} | {r.get('source_id', '')} | {fr.flag_codes}"
+                    f"  {fr.severity:3d} | {r.get('id', '')} | {r.get('source_id', '')} | "
+                    f"{fr.flag_codes}"
                 )
 
     except Exception as e:

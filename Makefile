@@ -27,10 +27,10 @@ lint:
 	uv run ruff check . --fix
 
 test:
-	uv run pytest -q -m "not integration"
+	uv run python -m pytest -q -m "not integration"
 
 test-integration:
-	uv run pytest -q -m integration
+	uv run python -m pytest -q -m integration
 
 # --- App ---------------------------------------------------------------------
 
@@ -59,7 +59,8 @@ logs:
 	docker compose logs -f
 
 db-wait:
-	until docker compose exec -T db pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB >/dev/null 2>&1; do \
+	@$(ENV_EXPORT) \
+	until docker compose exec -T db pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" >/dev/null 2>&1; do \
 		echo "waiting for postgres..."; \
 		sleep 1; \
 	done
@@ -67,11 +68,12 @@ db-wait:
 # --- Migrations / transforms --------------------------------------------------
 
 migrate: db-wait
-	uv run alembic upgrade head
+	@$(ENV_EXPORT) \
+	uv run python -m alembic upgrade head
 
 # usage: make revision m="add pipeline_runs table"
 revision:
-	uv run alembic revision -m "$(m)"
+	uv run python -m alembic revision -m "$(m)"
 
 metrics:
 	@$(ENV_EXPORT) \
@@ -83,6 +85,11 @@ metrics:
 # --- Portfolio demo helpers ---------------------------------------------------
 
 ingest-samples:
+	@$(ENV_EXPORT) \
+	PYTHONPATH=$(PYTHONPATH) uv run python -m app.ingestion --samples
+
+# Keep the old API curl behaviour as an opt-in target
+ingest-samples-api:
 	curl -s -X POST http://localhost:$(API_PORT)/ingest/samples | python -m json.tool
 
 clean:
@@ -94,10 +101,34 @@ flags:
 	PYTHONPATH=$(PYTHONPATH) uv run python -m app.flags
 
 runs:
-	@set -a; source .env; set +a; \
+	@$(ENV_EXPORT) \
 	docker compose exec -T db psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c \
-	"SELECT pipeline, status, duration_ms, started_at FROM pipeline_runs ORDER BY started_at DESC LIMIT 10;"
+	"SELECT pipeline, id AS run_id, status, duration_ms, started_at FROM pipeline_runs ORDER BY started_at DESC LIMIT 10;"
 
 refresh: clean metrics
 
-demo: ingest-samples flags runs
+demo:
+	@set -euo pipefail; \
+	echo "============================================================"; \
+	echo "D2D DEMO — golden path"; \
+	echo "Steps: services up → migrate → ingest(samples) → flags → summary"; \
+	echo "============================================================"; \
+	$(MAKE) db-up >/dev/null; \
+	$(MAKE) migrate >/dev/null; \
+	echo ""; \
+	echo "--- ingest (samples) ---"; \
+	$(ENV_EXPORT) PYTHONPATH=$(PYTHONPATH) uv run python -m app.ingestion --samples; \
+	echo ""; \
+	echo "--- flags ---"; \
+	$(ENV_EXPORT) PYTHONPATH=$(PYTHONPATH) uv run python -m app.flags; \
+	echo ""; \
+	echo "--- recent pipeline_runs ---"; \
+	$(ENV_EXPORT) docker compose exec -T db psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c \
+	"SELECT pipeline, id AS run_id, status, duration_ms, started_at FROM pipeline_runs ORDER BY started_at DESC LIMIT 5;"; \
+	echo ""; \
+	echo "--- record counts ---"; \
+	$(ENV_EXPORT) docker compose exec -T db psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c \
+	"SELECT 'raw_records' AS table, COUNT(*) AS rows FROM raw_records UNION ALL SELECT 'ingest_runs', COUNT(*) FROM ingest_runs;"; \
+	echo ""; \
+	echo "✅ END BANNER: make demo succeeded"; \
+	echo "============================================================"

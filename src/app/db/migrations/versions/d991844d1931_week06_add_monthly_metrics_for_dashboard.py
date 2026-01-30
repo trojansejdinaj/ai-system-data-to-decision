@@ -36,14 +36,22 @@ def upgrade() -> None:
     )
 
     op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_monthly_metrics_month_start ON summary.monthly_metrics(month_start);"
+        """
+        CREATE INDEX IF NOT EXISTS ix_monthly_metrics_month_start
+        ON summary.monthly_metrics (month_start);
+        """
     )
 
     # backfill from raw_records (bucket by month)
     op.execute(
         """
         INSERT INTO summary.monthly_metrics (
-          month_start, total_records, distinct_records, distinct_source_ids, distinct_sources, distinct_categories
+          month_start,
+          total_records,
+          distinct_records,
+          distinct_source_ids,
+          distinct_sources,
+          distinct_categories
         )
         SELECT
           date_trunc('month', event_time)::date AS month_start,
