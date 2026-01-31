@@ -99,31 +99,60 @@ class RunTracker:
             },
         )
 
-    def succeed(self):
-        ended_at = datetime.now(UTC)
-        duration_ms = int((ended_at - self.started_at).total_seconds() * 1000)
+    def set_counts(self, records_in: int | None = None, records_out: int | None = None) -> None:
+        """Set optional input/output counts on the persisted run row.
+
+        This flushes the change so other sessions can see the values before final commit.
+        """
+        if records_in is not None:
+            self.row.records_in = records_in
+        if records_out is not None:
+            self.row.records_out = records_out
+        # persist the partial update without committing the whole run lifecycle
+        self.db.add(self.row)
+        try:
+            self.db.flush()
+        except Exception:
+            # don't raise here; counts are best-effort and shouldn't break the pipeline
+            self.db.rollback()
+
+    def succeed(self, records_in: int | None = None, records_out: int | None = None):
+        finished_at = datetime.now(UTC)
+        duration_ms = int((finished_at - self.started_at).total_seconds() * 1000)
 
         self.row.status = "succeeded"
-        self.row.ended_at = ended_at
+        self.row.finished_at = finished_at
         self.row.duration_ms = duration_ms
+        # ensure error_summary is null on success
+        self.row.error_summary = None
+        if records_in is not None:
+            self.row.records_in = records_in
+        if records_out is not None:
+            self.row.records_out = records_out
         self.row.steps = [s.__dict__ for s in self.steps]
         self.db.add(self.row)
         self.db.commit()
 
         self.log("run_succeeded", status="succeeded", duration_ms=duration_ms)
 
-    def fail(self, exc: Exception):
-        ended_at = datetime.now(UTC)
-        duration_ms = int((ended_at - self.started_at).total_seconds() * 1000)
+    def fail(self, exc: Exception, records_in: int | None = None, records_out: int | None = None):
+        finished_at = datetime.now(UTC)
+        duration_ms = int((finished_at - self.started_at).total_seconds() * 1000)
 
         # IMPORTANT: rollback whatever work failed, but still persist run status
         self.db.rollback()
 
         self.row.status = "failed"
-        self.row.ended_at = ended_at
+        self.row.finished_at = finished_at
         self.row.duration_ms = duration_ms
+        if records_in is not None:
+            self.row.records_in = records_in
+        if records_out is not None:
+            self.row.records_out = records_out
         self.row.error_type = type(exc).__name__
         self.row.error_message = str(exc)
+        # set a concise error summary (nullable guidance)
+        self.row.error_summary = str(exc)
         self.row.steps = [s.__dict__ for s in self.steps]
         self.db.add(self.row)
         self.db.commit()

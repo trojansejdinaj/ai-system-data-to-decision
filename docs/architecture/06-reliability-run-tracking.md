@@ -66,8 +66,11 @@ Keep step names stable over time so dashboards/alerts can rely on them.
 - `id` (UUID, PK)  -> `run_id`
 - `pipeline` (text)
 - `status` (running/succeeded/failed)
-- `started_at`, `ended_at`
+- `started_at`, `finished_at`
 - `duration_ms`
+- `records_in` (Integer, nullable) — optional processed input count
+- `records_out` (Integer, nullable) — optional produced output count
+- `error_summary` (Text, nullable) — short human-friendly error summary
 - `input_ref` (optional string identifier, e.g. filename or sql path)
 - `meta` (JSON)
 - `steps` (JSON array of `{step,status,duration_ms,...}`)

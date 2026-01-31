@@ -180,10 +180,12 @@ def ingest_files(db: Session, source: str, files: list[tuple[str, bytes]]) -> In
         run.status = "success"
         db.commit()
 
-        tracker.succeed()
+        # pass counts directly into the tracker success path
+        tracker.succeed(records_in=total, records_out=inserted)
 
         return IngestResult(
-            run_id=run.id,
+            # use the tracker run_id so all outputs/logs share the same run id
+            run_id=tracker.run_id,
             total_records=total,
             inserted_records=inserted,
             deduped_records=deduped,

@@ -75,8 +75,12 @@ class PipelineRun(Base):
     status: Mapped[str] = mapped_column(String(20), default="running", index=True)
 
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    records_in: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    records_out: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     input_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
     meta: Mapped[dict] = mapped_column(JSONB, default=dict)

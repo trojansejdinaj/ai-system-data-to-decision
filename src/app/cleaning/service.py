@@ -77,6 +77,11 @@ def refresh_clean_records(db: Session, *, limit: int = 5000) -> int:
         db.commit()
         total_clean = db.query(func.count(CleanRecord.id)).scalar() or 0
         tracker.row.meta = {**(tracker.row.meta or {}), "total_clean": int(total_clean)}
+        # wire counts: input = raws scanned, output = total_clean
+        try:
+            tracker.set_counts(records_in=len(raws), records_out=int(total_clean))
+        except Exception:
+            pass
         tracker.succeed()
         return int(total_clean)
 

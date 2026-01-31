@@ -51,7 +51,7 @@ make dev-all
 
 - docker compose up -d (start Postgres)
 - waits for DB readiness
-- alembic upgrade head (apply migrations)
+- uv run python -m alembic upgrade head (apply migrations)
 - starts FastAPI via uvicorn with --reload
 
 **Open:**

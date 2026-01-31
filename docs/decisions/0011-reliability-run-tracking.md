@@ -18,7 +18,9 @@ Print-based logging and ad-hoc error handling do not scale once multiple pipelin
    - run identity (`run_id`)
    - pipeline name
    - status (`running/succeeded/failed`)
-   - timing (`started_at`, `ended_at`, `duration_ms`)
+   - timing (`started_at`, `finished_at`, `duration_ms`)
+   - run metrics (`records_in` INTEGER NULLABLE, `records_out` INTEGER NULLABLE)
+   - `error_summary` (TEXT NULLABLE)
    - per-step results (JSON list with step name/status/duration)
    - error info on failures (`error_type`, `error_message`)
 3) Implement a small `RunTracker` + `StepTimer` wrapper to:

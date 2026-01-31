@@ -37,7 +37,7 @@ test-integration:
 # Keep "from app..." imports working with src-layout:
 # - PYTHONPATH=src makes src/app importable as "app"
 run:
-	PYTHONPATH=$(PYTHONPATH) uv run uvicorn app.main:app --reload --host $(API_HOST) --port $(API_PORT) --env-file .env
+	PYTHONPATH=$(PYTHONPATH) uv run python -m uvicorn app.main:app --reload --host $(API_HOST) --port $(API_PORT) --env-file .env
 
 # Full local dev bring-up: start db, migrate, run api
 dev-all: db-up migrate run
@@ -97,13 +97,13 @@ clean:
 	PYTHONPATH=$(PYTHONPATH) uv run python -m app.cleaning
 
 flags:
-	@set -a; source .env; set +a; \
+	@$(ENV_EXPORT) \
 	PYTHONPATH=$(PYTHONPATH) uv run python -m app.flags
 
 runs:
 	@$(ENV_EXPORT) \
 	docker compose exec -T db psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c \
-	"SELECT pipeline, id AS run_id, status, duration_ms, started_at FROM pipeline_runs ORDER BY started_at DESC LIMIT 10;"
+	"SELECT pipeline, id AS run_id, status, started_at, finished_at, duration_ms, records_in, records_out, error_summary FROM pipeline_runs ORDER BY started_at DESC LIMIT 10;"
 
 refresh: clean metrics
 

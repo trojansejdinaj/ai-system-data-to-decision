@@ -16,7 +16,9 @@ Failures yield clear, actionable logs and each pipeline run is traceable end-to-
 ### Run tracking (DB)
 - New `pipeline_runs` table captures:
   - `pipeline`, `status`
-  - `started_at`, `ended_at`, `duration_ms`
+  - `started_at`, `finished_at`, `duration_ms`
+  - `records_in` (Integer, nullable), `records_out` (Integer, nullable)
+  - `error_summary` (Text, nullable)
   - `steps` (JSON array of step results)
   - `error_type`, `error_message` (on failures)
 - Implemented `RunTracker` + `StepTimer` pattern used by pipelines.
