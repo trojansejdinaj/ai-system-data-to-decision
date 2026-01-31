@@ -110,3 +110,25 @@ def test_run_tracker_fail_marks_failed_and_rolls_back_and_persists_error():
     events = parse_lines(stream)
     assert any(e["message"] == "run_failed" for e in events)
     assert any(e["message"] == "step_failed" and e["step"] == "write_report" for e in events)
+
+
+def test_fail_sets_finished_and_error_summary():
+    db = FakeSession()
+    logger, stream = make_json_logger()
+
+    tracker = RunTracker(db=db, logger=logger, pipeline="flags")
+
+    # simulate a failing step
+    with pytest.raises(RuntimeError):
+        with tracker.step("explode"):
+            raise RuntimeError("kaboom")
+
+    # trigger the run failure path
+    tracker.fail(RuntimeError("kaboom"))
+
+    assert tracker.row.status == "failed"
+    # finished_at should be set on failure
+    assert getattr(tracker.row, "finished_at", None) is not None
+    # error_summary should contain the error message
+    assert getattr(tracker.row, "error_summary", None) is not None
+    assert "kaboom" in (tracker.row.error_summary or "")

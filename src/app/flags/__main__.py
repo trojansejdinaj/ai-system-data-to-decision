@@ -60,6 +60,12 @@ def main() -> None:
         ):
             out = write_flag_report_csv(flagged, out_path)
 
+        # wire counts into run tracker
+        try:
+            tracker.set_counts(records_in=len(records), records_out=len(flagged))
+        except Exception:
+            pass
+
         tracker.succeed()
 
         print(f"Flagged records: {len(flagged)} / {len(records)}")

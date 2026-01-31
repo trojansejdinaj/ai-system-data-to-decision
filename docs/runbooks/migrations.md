@@ -98,7 +98,7 @@ make migrate
 
 This:
 1. Waits for DB readiness (`make db-wait`)
-2. Runs `alembic upgrade head`
+2. Runs `uv run python -m alembic upgrade head`
 3. Applies all pending migrations
 
 Check success:
@@ -202,7 +202,7 @@ cat src/app/db/migrations/versions/abc123def456_add_users_table.py
 ### Downgrade to Previous Migration
 
 ```bash
-uv run alembic downgrade -1
+uv run python -m alembic downgrade -1
 ```
 
 This runs the `downgrade()` function of the current migration.
@@ -210,7 +210,7 @@ This runs the `downgrade()` function of the current migration.
 ### Downgrade to a Specific Version
 
 ```bash
-uv run alembic downgrade abc123def456
+uv run python -m alembic downgrade abc123def456
 ```
 
 Downgrades to the migration with that ID.
@@ -218,7 +218,7 @@ Downgrades to the migration with that ID.
 ### Downgrade All
 
 ```bash
-uv run alembic downgrade base
+uv run python -m alembic downgrade base
 ```
 
 Removes all migrations (tables drop). **Warning:** Deletes data!
@@ -261,8 +261,8 @@ Then run `make migrate`.
 
 If the model and DB are misaligned:
 
-1. Check current version: `uv run alembic current`
-2. Check migration history: `uv run alembic history`
+1. Check current version: `uv run python -m alembic current`
+2. Check migration history: `uv run python -m alembic history`
 3. Reset and reapply:
    ```bash
    make db-down

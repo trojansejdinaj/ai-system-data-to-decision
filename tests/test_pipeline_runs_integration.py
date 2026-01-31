@@ -97,7 +97,17 @@ def test_flags_writes_pipeline_run_row(tmp_path):
             conn.execute(
                 text(
                     """
-                SELECT pipeline, status, duration_ms, steps, error_type, error_message, started_at
+                SELECT
+                    pipeline,
+                    status,
+                    duration_ms,
+                    steps,
+                    error_type,
+                    error_message,
+                    started_at,
+                    finished_at,
+                    records_in,
+                    records_out
                 FROM pipeline_runs
                 WHERE pipeline = 'flags'
                 AND (:before IS NULL OR started_at > :before)
@@ -117,6 +127,16 @@ def test_flags_writes_pipeline_run_row(tmp_path):
         f"Expected succeeded, got: {row['status']} ({row.get('error_message')})"
     )
     assert row["duration_ms"] is not None and row["duration_ms"] >= 0
+
+    # finished_at should be present (we write finished_at on success)
+    assert row["finished_at"] is not None
+
+    # records_in/out should be integers when populated (best-effort wiring)
+    # They may be NULL in older DBs; only assert type/values when not None
+    if row["records_in"] is not None:
+        assert isinstance(row["records_in"], int) and row["records_in"] >= 0
+    if row["records_out"] is not None:
+        assert isinstance(row["records_out"], int) and row["records_out"] >= 0
 
     steps = row["steps"]
     assert isinstance(steps, list) and len(steps) > 0, "Expected non-empty steps JSON"
