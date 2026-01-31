@@ -105,12 +105,6 @@ runs:
 	docker compose exec -T db psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c \
 	"SELECT pipeline, id AS run_id, status, started_at, finished_at, duration_ms, records_in, records_out, error_summary FROM pipeline_runs ORDER BY started_at DESC LIMIT 10;"
 
-runs-full:
-	@$(ENV_EXPORT) \
-	docker compose exec -T db psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c \
-	"SELECT pipeline, id AS run_id, status, started_at, finished_at, duration_ms, records_in, records_out, error_summary \
-	 FROM pipeline_runs ORDER BY started_at DESC LIMIT 10;"
-
 refresh: clean metrics
 
 demo:
