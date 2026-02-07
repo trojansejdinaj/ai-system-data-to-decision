@@ -65,6 +65,11 @@ make dev-all
 make demo
 ```
 
+**Clean reset + golden path (recommended before demos/tests):**
+```bash
+make demo-reset
+```
+
 **What demo does (in order):**
 
 1. `make db-up` — start Postgres container
@@ -119,6 +124,7 @@ make run
 ```bash
 make lint
 make test
+make test-integration
 ```
 
 ### Tail docker logs

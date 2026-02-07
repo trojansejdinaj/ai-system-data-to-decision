@@ -13,7 +13,7 @@ ENV_EXPORT := set -a; source .env; set +a;
 	run dev-all \
 	db-up db-down db-reset db-wait logs \
 	migrate revision metrics \
-	ingest-samples flags runs demo clean refresh
+	ingest-samples flags runs demo demo-reset clean refresh
 
 # --- Python env --------------------------------------------------------------
 
@@ -132,3 +132,8 @@ demo:
 	echo ""; \
 	echo "✅ END BANNER: make demo succeeded"; \
 	echo "============================================================"
+
+demo-reset:
+	@set -euo pipefail; \
+	$(MAKE) db-reset; \
+	$(MAKE) demo
