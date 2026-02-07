@@ -34,42 +34,28 @@ This orchestrates the complete golden path end-to-end:
 1. Starts Postgres (docker compose up -d)
 2. Waits for DB readiness
 3. Applies migrations (`uv run python -m alembic upgrade head`)
-4. Runs ingestion (`uv run python -m app.ingestion --samples`)
-5. Runs flags engine (`uv run python -m app.flags`)
-6. Prints recent pipeline_runs (last 5)
-7. Prints record counts (raw_records, ingest_runs)
-8. Exits with success banner
+4. Runs the demo runner (`uv run python -m app.demo`)
+5. Demo runner executes ingestion + flags
+6. Prints one final `DEMO SUMMARY` block
 
-**Expected output:**
+**Expected final output block:**
 
 ```
 ============================================================
-D2D DEMO — golden path
-Steps: services up → migrate → ingest(samples) → flags → summary
+DEMO SUMMARY
+------------------------------------------------------------
+run_id      : 123e4567-e89b-12d3-a456-426614174000
+status      : succeeded
+duration_ms : 1538
+records_in  : 30
+records_out : 20
 ============================================================
+```
 
---- ingest (samples) ---
-[ingestion logs: fetching samples, deduplication stats, etc.]
+Inspect persisted runs:
 
---- flags ---
-[flags engine logs: scanning for exceptions, etc.]
-
---- recent pipeline_runs ---
- pipeline | run_id | status |  duration_ms | started_at
------------+--------+--------+--------------+----------------------------
- ingest   | 123    | OK     | 1234         | 2026-01-30 10:00:00
- flags    | 124    | OK     | 456          | 2026-01-30 10:00:02
-(2 rows)
-
---- record counts ---
-      table    | rows
---------------+------
- raw_records  |   10
- ingest_runs  |    2
-(2 rows)
-
-✅ END BANNER: make demo succeeded
-============================================================
+```bash
+make runs
 ```
 
 Exit code: **0** (success)

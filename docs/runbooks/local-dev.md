@@ -60,6 +60,25 @@ make dev-all
 
 ## Portfolio demo flow
 
+### How to run demo (fresh clone)
+
+Prerequisites: `uv` and Docker/Compose installed and running.
+
+```bash
+cp .env.example .env
+make sync
+make demo
+```
+
+Run results are persisted in `pipeline_runs` (use `make runs` to inspect), and the CLI also prints one final `DEMO SUMMARY` block.
+
+`DEMO SUMMARY` fields:
+- `run_id`: UUID of the top-level `pipeline_runs` row for the demo execution.
+- `status`: Final run state (`succeeded` or `failed`).
+- `duration_ms`: End-to-end runtime for the demo pipeline in milliseconds.
+- `records_in`: Sum of `records_in` from demo sub-pipelines (`ingest` + `flags`) in this run window.
+- `records_out`: Sum of `records_out` from demo sub-pipelines (`ingest` + `flags`) in this run window.
+
 **The golden path (T1 DoD):**
 ```bash
 make demo
@@ -74,11 +93,8 @@ make demo-reset
 
 1. `make db-up` — start Postgres container
 2. `make migrate` — apply latest migrations
-3. `make ingest-samples` — run CLI ingestion (no API needed)
-4. `make flags` — run exceptions/flags engine
-5. Print latest pipeline_runs (5 rows)
-6. Print record counts (raw_records, ingest_runs)
-7. Exit with success banner
+3. `uv run python -m app.demo` — execute ingest + flags and persist top-level demo run tracking
+4. Print one final `DEMO SUMMARY` block (always once, including failure)
 
 **Prove idempotency: run it twice**
 ```bash

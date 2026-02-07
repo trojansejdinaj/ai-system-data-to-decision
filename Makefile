@@ -109,29 +109,9 @@ refresh: clean metrics
 
 demo:
 	@set -euo pipefail; \
-	echo "============================================================"; \
-	echo "D2D DEMO — golden path"; \
-	echo "Steps: services up → migrate → ingest(samples) → flags → summary"; \
-	echo "============================================================"; \
 	$(MAKE) db-up >/dev/null; \
 	$(MAKE) migrate >/dev/null; \
-	echo ""; \
-	echo "--- ingest (samples) ---"; \
-	$(ENV_EXPORT) PYTHONPATH=$(PYTHONPATH) uv run python -m app.ingestion --samples; \
-	echo ""; \
-	echo "--- flags ---"; \
-	$(ENV_EXPORT) PYTHONPATH=$(PYTHONPATH) uv run python -m app.flags; \
-	echo ""; \
-	echo "--- recent pipeline_runs ---"; \
-	$(ENV_EXPORT) docker compose exec -T db psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c \
-	"SELECT pipeline, id AS run_id, status, duration_ms, started_at FROM pipeline_runs ORDER BY started_at DESC LIMIT 5;"; \
-	echo ""; \
-	echo "--- record counts ---"; \
-	$(ENV_EXPORT) docker compose exec -T db psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c \
-	"SELECT 'raw_records' AS table, COUNT(*) AS rows FROM raw_records UNION ALL SELECT 'ingest_runs', COUNT(*) FROM ingest_runs;"; \
-	echo ""; \
-	echo "✅ END BANNER: make demo succeeded"; \
-	echo "============================================================"
+	$(ENV_EXPORT) PYTHONPATH=$(PYTHONPATH) uv run python -m app.demo
 
 demo-reset:
 	@set -euo pipefail; \
