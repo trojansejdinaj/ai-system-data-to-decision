@@ -206,3 +206,6 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 AUDIT_REPORT.md
+
+# Generated reports (demo artifacts)
+docs/assets/**/flags_report.csv
