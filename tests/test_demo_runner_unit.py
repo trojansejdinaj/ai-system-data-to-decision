@@ -91,4 +91,3 @@ def test_demo_fail_marks_failed_and_prints_summary_once(
     assert "Forced demo failure" in row.error_summary
     assert row.records_in == 20
     assert row.records_out == 10
-

@@ -38,7 +38,9 @@ A minimal, end-to-end data pipeline that turns messy source files into decision-
 - Computes deterministic features from `clean.clean_records` during `make demo`
 - Persists features to `features.feature_values` keyed by (`run_id`, `dataset_key`, `feature_name`)
 - For v0, `dataset_key == clean.clean_records.source` (in demo runs, `dataset_key` comes from `DEMO_SOURCE`)
-- Adds a `decisions.decisions` table for policy outputs (`decision`, `score`, `reasons`)
+- Adds a `decisions` table (public schema) for policy outputs:
+  `policy_version`, `policy_hash`, `decision`, `score`, `reasons`, `explanation_json`
+- Decision policy command: `uv run python -m app.decisions`
 
 ---
 
@@ -67,11 +69,20 @@ PYTHONPATH=src uv run python -m app.flags
 # (If your repo provides a CLI entrypoint, use that instead.)
 ```
 
-### 5) Proof query: check persisted run tracking
+### 5) Run the decision policy pipeline
+
+```bash
+uv run python -m app.decisions
+```
+
+### 6) Proof query: check persisted run tracking + decisions
 
 ```bash
 docker compose exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
 "SELECT pipeline, status, duration_ms, started_at FROM pipeline_runs ORDER BY started_at DESC LIMIT 10;"
+
+docker compose exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
+"SELECT run_id, decision, score, policy_version, policy_hash FROM decisions ORDER BY created_at DESC LIMIT 10;"
 ```
 
 ---

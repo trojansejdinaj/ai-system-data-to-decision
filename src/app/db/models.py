@@ -7,6 +7,7 @@ from decimal import Decimal
 import sqlalchemy as sa
 from sqlalchemy import (
     BigInteger,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
@@ -160,17 +161,19 @@ class FeatureValue(Base):
 class Decision(Base):
     __tablename__ = "decisions"
     __table_args__ = (
-        UniqueConstraint("run_id", "policy_version", name="uq_decisions_run_policy_version"),
+        CheckConstraint("char_length(policy_hash) = 64", name="ck_decisions_policy_hash_len"),
+        UniqueConstraint("run_id", name="uq_decisions_run_id"),
         Index("ix_decisions_run_id", "run_id"),
-        {"schema": "decisions"},
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     run_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("pipeline_runs.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("pipeline_runs.id", ondelete="CASCADE"), nullable=False
     )
-    policy_version: Mapped[str] = mapped_column(String(50), nullable=False)
-    decision: Mapped[str] = mapped_column(String(20), nullable=False)
-    score: Mapped[Decimal | None] = mapped_column(sa.Numeric(18, 6), nullable=True)
-    reasons: Mapped[list] = mapped_column(JSONB, default=list)
+    policy_version: Mapped[str] = mapped_column(Text, nullable=False)
+    policy_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    decision: Mapped[str] = mapped_column(Text, nullable=False)
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    reasons: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    explanation_json: Mapped[dict] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

@@ -76,8 +76,7 @@ def rule_future_event_time(record: dict[str, Any], now: datetime) -> Flag | None
             code="FUTURE_EVENT_TIME",
             weight=25,
             message=(
-                f"event_time={event_time.isoformat()} is in the future "
-                f"vs now={now.isoformat()}"
+                f"event_time={event_time.isoformat()} is in the future vs now={now.isoformat()}"
             ),
         )
     return None

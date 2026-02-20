@@ -101,8 +101,7 @@ def test_make_demo_creates_successful_pipeline_runs(tmp_path: Path) -> None:
         table_exists = bool(conn.execute(text("SELECT to_regclass('pipeline_runs')")).scalar())
         if not table_exists:
             pytest.skip(
-                "pipeline_runs table not found. "
-                "Run migrations (for example: make migrate)."
+                "pipeline_runs table not found. Run migrations (for example: make migrate)."
             )
 
         before_started_at = conn.execute(text("SELECT max(started_at) FROM pipeline_runs")).scalar()
@@ -171,8 +170,7 @@ def test_make_demo_fail_returns_nonzero_and_persists_failed_run(tmp_path: Path) 
         table_exists = bool(conn.execute(text("SELECT to_regclass('pipeline_runs')")).scalar())
         if not table_exists:
             pytest.skip(
-                "pipeline_runs table not found. "
-                "Run migrations (for example: make migrate)."
+                "pipeline_runs table not found. Run migrations (for example: make migrate)."
             )
 
         before_started_at = conn.execute(text("SELECT max(started_at) FROM pipeline_runs")).scalar()

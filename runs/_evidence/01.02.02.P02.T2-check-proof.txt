@@ -1,0 +1,46 @@
+Task: 01.02.02.P02.T2 — Implement decision policy v0 (rules + score + reasons + explanation JSON)
+Date: 2026-02-20
+
+[1] Policy snapshot excerpt (canonical source: src/app/decisions/policy_v0.py)
+{
+  "policy_version": "v0",
+  "score_start": 100,
+  "thresholds": {
+    "approve_min": 80,
+    "review_min": 50
+  },
+  "rules": [
+    {"code": "LOW_RECORD_VOLUME", "feature": "total_clean_records", "operator": "<", "value": 5, "penalty": 21},
+    {"code": "HIGH_NULL_RATE", "feature": "null_value_decimal_rate", "operator": ">", "value": 0.10, "penalty": 20},
+    {"code": "LOW_CATEGORY_DIVERSITY", "feature": "distinct_categories", "operator": "<", "value": 2, "penalty": 12},
+    {"code": "LOW_AVG_VALUE", "feature": "avg_value_decimal", "operator": "<", "value": 3, "penalty": 8}
+  ]
+}
+
+Canonical policy_hash (sha256 of sorted-key/separator canonical JSON):
+6c3d88aa83a9f2e421c57b481056bc2ce7cbc5bb03f1d6e426e16beffb7ad563
+
+[2] Decisions pipeline log excerpt (uv run python -m app.decisions)
+{"ts": "2026-02-20T02:04:19.164806+00:00", "level": "INFO", "logger": "__main__", "message": "run_started", "run_id": "f86ef325-3bf6-406a-bba0-b77c417cf6ff", "pipeline": "decisions", "status": "running"}
+{"ts": "2026-02-20T02:04:19.164913+00:00", "level": "INFO", "logger": "__main__", "message": "step_started", "run_id": "f86ef325-3bf6-406a-bba0-b77c417cf6ff", "pipeline": "decisions", "step": "build_features", "status": "running"}
+{"ts": "2026-02-20T02:04:19.164954+00:00", "level": "INFO", "logger": "__main__", "message": "features_built", "run_id": "f86ef325-3bf6-406a-bba0-b77c417cf6ff", "pipeline": "decisions", "feature_count": 4}
+{"ts": "2026-02-20T02:04:19.165025+00:00", "level": "INFO", "logger": "__main__", "message": "step_started", "run_id": "f86ef325-3bf6-406a-bba0-b77c417cf6ff", "pipeline": "decisions", "step": "evaluate_policy_v0", "status": "running"}
+{"ts": "2026-02-20T02:04:19.165126+00:00", "level": "INFO", "logger": "__main__", "message": "policy_evaluated", "run_id": "f86ef325-3bf6-406a-bba0-b77c417cf6ff", "pipeline": "decisions", "decision": "reject", "score": 39, "policy_version": "v0", "policy_hash": "6c3d88aa83a9f2e421c57b481056bc2ce7cbc5bb03f1d6e426e16beffb7ad563"}
+{"ts": "2026-02-20T02:04:19.165213+00:00", "level": "INFO", "logger": "__main__", "message": "step_started", "run_id": "f86ef325-3bf6-406a-bba0-b77c417cf6ff", "pipeline": "decisions", "step": "write_decision", "status": "running"}
+{"ts": "2026-02-20T02:04:19.179805+00:00", "level": "INFO", "logger": "__main__", "message": "decision_written", "run_id": "f86ef325-3bf6-406a-bba0-b77c417cf6ff", "pipeline": "decisions", "decision": "reject", "score": 39, "reason_count": 4}
+{"ts": "2026-02-20T02:04:19.185285+00:00", "level": "INFO", "logger": "__main__", "message": "run_succeeded", "run_id": "f86ef325-3bf6-406a-bba0-b77c417cf6ff", "pipeline": "decisions", "status": "succeeded", "duration_ms": 36}
+
+[3] Persisted decision row snippet (latest from public.decisions)
+{
+  "run_id": "bb452f61-d819-49ba-a77b-ed5fa24aa038",
+  "decision": "reject",
+  "score": 39,
+  "reasons": [
+    "record volume below minimum baseline",
+    "null numeric value rate is elevated",
+    "category diversity is too low",
+    "average numeric value is too low"
+  ],
+  "policy_version": "v0",
+  "policy_hash": "6c3d88aa83a9f2e421c57b481056bc2ce7cbc5bb03f1d6e426e16beffb7ad563"
+}
