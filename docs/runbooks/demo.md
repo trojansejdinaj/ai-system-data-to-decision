@@ -38,6 +38,10 @@ This orchestrates the complete golden path end-to-end:
 5. Demo runner executes ingestion + flags
 6. Prints one final `DEMO SUMMARY` block
 
+For v0, `dataset_key == clean.clean_records.source`.
+In demo runs, `dataset_key` is set from `DEMO_SOURCE` (default `samples`) and used directly to filter clean records.
+See `docs/architecture/08-decision-features-v0.md` for the feature-scope definition (`source = :dataset_key`).
+
 **Expected final output block:**
 
 ```

@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from sqlalchemy import text
 
 from app.db.session import SessionLocal
+from app.features.compute import compute_features_for_run
 from app.observability.logging import get_logger
 from app.observability.run_tracking import RunTracker
 
@@ -74,6 +75,7 @@ def format_demo_summary(
 
 def main() -> int:
     logger = get_logger(__name__)
+    dataset_key = os.getenv("DEMO_SOURCE", "samples")
     db = SessionLocal()
     tracker = RunTracker(db, logger, pipeline="demo", input_ref="make demo")
 
@@ -81,13 +83,20 @@ def main() -> int:
 
     try:
         with tracker.step("ingest_samples"):
-            _run_python_module("app.ingestion", ["--samples"])
+            _run_python_module("app.ingestion", ["--samples", "--source", dataset_key])
+
+        with tracker.step("clean"):
+            _run_python_module("app.cleaning")
 
         if _is_truthy(os.getenv("DEMO_FAIL")):
             raise RuntimeError("Forced demo failure (DEMO_FAIL=1).")
 
         with tracker.step("flags"):
             _run_python_module("app.flags")
+
+        with tracker.step("compute_features", meta={"dataset_key": dataset_key}):
+            persisted = compute_features_for_run(db, tracker.run_id, dataset_key=dataset_key)
+            tracker.log("features_persisted", feature_count=len(persisted), dataset_key=dataset_key)
 
         records_in, records_out = _collect_subpipeline_counts(db, tracker.started_at)
         tracker.succeed(records_in=records_in, records_out=records_out)

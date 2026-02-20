@@ -22,11 +22,17 @@ def main() -> int:
         help="Ingest repo sample files (data/samples/sample.csv + sample.xlsx).",
     )
     p.add_argument(
+        "--dataset-key",
+        default=None,
+        help="Dataset key/source label stored on ingest_runs/raw_records (default: samples).",
+    )
+    p.add_argument(
         "--source",
-        default="samples",
-        help="Source label stored on ingest_runs/raw_records (default: samples).",
+        default=None,
+        help="Compatibility alias for --dataset-key.",
     )
     args = p.parse_args()
+    dataset_key = args.dataset_key or args.source or "samples"
 
     if not args.samples:
         print("Nothing to do. Try: python -m app.ingestion --samples", file=sys.stderr)
@@ -40,7 +46,7 @@ def main() -> int:
 
     db = SessionLocal()
     try:
-        result = ingest_files(db=db, source=args.source, files=files)
+        result = ingest_files(db=db, source=dataset_key, files=files)
         print(
             json.dumps(
                 {

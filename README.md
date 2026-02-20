@@ -34,6 +34,12 @@ A minimal, end-to-end data pipeline that turns messy source files into decision-
 - Emits structured logs (JSON-like) with trace IDs
 - Persists each pipeline execution into a `pipeline_runs` table (status, timestamps, duration, counts)
 
+### Decision features v0
+- Computes deterministic features from `clean.clean_records` during `make demo`
+- Persists features to `features.feature_values` keyed by (`run_id`, `dataset_key`, `feature_name`)
+- For v0, `dataset_key == clean.clean_records.source` (in demo runs, `dataset_key` comes from `DEMO_SOURCE`)
+- Adds a `decisions.decisions` table for policy outputs (`decision`, `score`, `reasons`)
+
 ---
 
 ## 2-minute demo (portfolio proof)

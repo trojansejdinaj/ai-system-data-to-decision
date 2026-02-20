@@ -13,6 +13,7 @@ This folder contains documentation for the `ai-system-data-to-decision` portfoli
 - Week 06 dashboard v1: `docs/architecture/05-dashboard-v1.md`
 - Week 08 reliability (run tracking + structured logs): `docs/architecture/06-reliability-run-tracking.md`
 - Week 09 silver layer (clean.clean_records): `docs/architecture/07-silver-layer-clean-records.md`
+- Decision features v0 + decisions schema: `docs/architecture/08-decision-features-v0.md`
 
 ## Runbooks
 - Demo (golden path): `docs/runbooks/demo.md`

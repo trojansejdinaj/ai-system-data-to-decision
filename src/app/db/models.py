@@ -5,7 +5,16 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import sqlalchemy as sa
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -96,13 +105,16 @@ class CleanRecord(Base):
         UniqueConstraint("source", "record_hash", name="uq_clean_records_source_record_hash"),
         Index("ix_clean_records_source_event_time", "source", "event_time"),
         Index("ix_clean_records_category", "category"),
+        Index("ix_clean_records_run_id", "run_id"),
         {"schema": "clean"},
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     raw_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
-    run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("pipeline_runs.id"), nullable=False
+    )
 
     source: Mapped[str] = mapped_column(String(50), index=True)
     record_hash: Mapped[str] = mapped_column(String(64), index=True)
@@ -117,3 +129,48 @@ class CleanRecord(Base):
 
     payload_clean: Mapped[dict] = mapped_column(JSONB, default=dict)
     cleaned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class FeatureValue(Base):
+    __tablename__ = "feature_values"
+    __table_args__ = (
+        UniqueConstraint(
+            "run_id",
+            "dataset_key",
+            "feature_name",
+            name="uq_feature_values_run_dataset_feature_name",
+        ),
+        Index("ix_feature_values_run_id", "run_id"),
+        Index("ix_feature_values_dataset_key", "dataset_key"),
+        {"schema": "features"},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("pipeline_runs.id"), nullable=False
+    )
+    dataset_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    feature_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    feature_value_num: Mapped[Decimal | None] = mapped_column(sa.Numeric(18, 6), nullable=True)
+    feature_value_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    feature_value_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Decision(Base):
+    __tablename__ = "decisions"
+    __table_args__ = (
+        UniqueConstraint("run_id", "policy_version", name="uq_decisions_run_policy_version"),
+        Index("ix_decisions_run_id", "run_id"),
+        {"schema": "decisions"},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("pipeline_runs.id"), nullable=False
+    )
+    policy_version: Mapped[str] = mapped_column(String(50), nullable=False)
+    decision: Mapped[str] = mapped_column(String(20), nullable=False)
+    score: Mapped[Decimal | None] = mapped_column(sa.Numeric(18, 6), nullable=True)
+    reasons: Mapped[list] = mapped_column(JSONB, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

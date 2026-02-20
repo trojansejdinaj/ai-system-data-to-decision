@@ -1,0 +1,37 @@
+Task: 01.02.02.P02.T1 — Define feature set + create persistence schema (features + decisions)
+Date: 2026-02-20
+
+[1] make migrate success excerpt
+$ make migrate
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade c7d9e1f2a3b4 -> e1f7a6c9b2d4, add feature_values and decisions tables
+
+[2] Demo logs (compute_features step)
+$ make demo
+{"ts": "2026-02-20T01:40:11.369308+00:00", "level": "INFO", "logger": "__main__", "message": "step_started", "taskName": null, "run_id": "d87d85fe-8b7c-445c-8980-1ce152a14fb4", "pipeline": "demo", "step": "compute_features", "status": "running", "meta": {"dataset_key": "samples"}}
+{"ts": "2026-02-20T01:40:11.380334+00:00", "level": "INFO", "logger": "__main__", "message": "features_persisted", "taskName": null, "run_id": "d87d85fe-8b7c-445c-8980-1ce152a14fb4", "pipeline": "demo", "feature_count": 6, "dataset_key": "samples"}
+{"ts": "2026-02-20T01:40:11.380443+00:00", "level": "INFO", "logger": "__main__", "message": "step_succeeded", "taskName": null, "run_id": "d87d85fe-8b7c-445c-8980-1ce152a14fb4", "pipeline": "demo", "step": "compute_features", "status": "ok", "duration_ms": 11}
+{"ts": "2026-02-20T01:40:17.089959+00:00", "level": "INFO", "logger": "__main__", "message": "step_started", "taskName": null, "run_id": "dff5ce4f-9db3-49b1-909e-c53dde5e2ee8", "pipeline": "demo", "step": "compute_features", "status": "running", "meta": {"dataset_key": "samples"}}
+{"ts": "2026-02-20T01:40:17.098290+00:00", "level": "INFO", "logger": "__main__", "message": "features_persisted", "taskName": null, "run_id": "dff5ce4f-9db3-49b1-909e-c53dde5e2ee8", "pipeline": "demo", "feature_count": 6, "dataset_key": "samples"}
+{"ts": "2026-02-20T01:40:17.098383+00:00", "level": "INFO", "logger": "__main__", "message": "step_succeeded", "taskName": null, "run_id": "dff5ce4f-9db3-49b1-909e-c53dde5e2ee8", "pipeline": "demo", "step": "compute_features", "status": "ok", "duration_ms": 8}
+
+[3] Verification query + output
+$ select run_id, dataset_key, feature_name, feature_value_num, computed_at
+  from features.feature_values
+  order by computed_at desc
+  limit 10;
+
+                run_id                | dataset_key |      feature_name       | feature_value_num |          computed_at
+--------------------------------------+-------------+-------------------------+-------------------+-------------------------------
+ dff5ce4f-9db3-49b1-909e-c53dde5e2ee8 | samples     | null_value_decimal_rate |          0.000000 | 2026-02-20 01:40:17.09187+00
+ dff5ce4f-9db3-49b1-909e-c53dde5e2ee8 | samples     | total_clean_records     |         10.000000 | 2026-02-20 01:40:17.09187+00
+ dff5ce4f-9db3-49b1-909e-c53dde5e2ee8 | samples     | distinct_sources        |          1.000000 | 2026-02-20 01:40:17.09187+00
+ dff5ce4f-9db3-49b1-909e-c53dde5e2ee8 | samples     | distinct_categories     |          3.000000 | 2026-02-20 01:40:17.09187+00
+ dff5ce4f-9db3-49b1-909e-c53dde5e2ee8 | samples     | sum_value_decimal       |        145.000000 | 2026-02-20 01:40:17.09187+00
+ dff5ce4f-9db3-49b1-909e-c53dde5e2ee8 | samples     | avg_value_decimal       |         14.500000 | 2026-02-20 01:40:17.09187+00
+ d87d85fe-8b7c-445c-8980-1ce152a14fb4 | samples     | total_clean_records     |         10.000000 | 2026-02-20 01:40:11.371432+00
+ d87d85fe-8b7c-445c-8980-1ce152a14fb4 | samples     | distinct_sources        |          1.000000 | 2026-02-20 01:40:11.371432+00
+ d87d85fe-8b7c-445c-8980-1ce152a14fb4 | samples     | distinct_categories     |          3.000000 | 2026-02-20 01:40:11.371432+00
+ d87d85fe-8b7c-445c-8980-1ce152a14fb4 | samples     | sum_value_decimal       |        145.000000 | 2026-02-20 01:40:11.371432+00
+(10 rows)
