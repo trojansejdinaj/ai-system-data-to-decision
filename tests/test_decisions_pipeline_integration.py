@@ -42,6 +42,24 @@ def _table_exists(engine, table_name: str) -> bool:
         return bool(conn.execute(query, {"table_name": table_name}).scalar())
 
 
+def _column_exists(engine, table_name: str, column_name: str) -> bool:
+    query = text(
+        """
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = :table_name
+          AND column_name = :column_name
+        LIMIT 1
+        """
+    )
+    with engine.connect() as conn:
+        return (
+            conn.execute(query, {"table_name": table_name, "column_name": column_name}).first()
+            is not None
+        )
+
+
 def test_decisions_pipeline_writes_run_and_decision_row() -> None:
     engine = _db_engine()
 
@@ -49,8 +67,10 @@ def test_decisions_pipeline_writes_run_and_decision_row() -> None:
         pytest.skip("pipeline_runs table not found. Did you run migrations (make migrate)?")
     if not _table_exists(engine, "decisions"):
         pytest.skip("decisions table not found. Did you run migrations (make migrate)?")
-    if not _table_exists(engine, "decision_outputs"):
-        pytest.skip("decision_outputs table not found. Did you run migrations (make migrate)?")
+    if not _column_exists(engine, "decisions", "top_reason"):
+        pytest.skip(
+            "decisions.top_reason column not found. Did you run latest migrations (make migrate)?"
+        )
 
     with engine.connect() as conn:
         before = conn.execute(
@@ -58,7 +78,7 @@ def test_decisions_pipeline_writes_run_and_decision_row() -> None:
                 """
                 SELECT started_at
                 FROM pipeline_runs
-                WHERE pipeline = 'decisions'
+                WHERE pipeline = 'decision'
                 ORDER BY started_at DESC
                 LIMIT 1
                 """
@@ -72,15 +92,16 @@ def test_decisions_pipeline_writes_run_and_decision_row() -> None:
     )
 
     proc = subprocess.run(
-        [sys.executable, "-m", "app.decisions"],
+        [sys.executable, "-m", "app.decision"],
         env=env,
         capture_output=True,
         text=True,
     )
 
     assert proc.returncode == 0, (
-        f"decisions pipeline failed:\nSTDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
+        f"decision pipeline failed:\nSTDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
     )
+    assert "DECISION:" in proc.stdout
 
     with engine.connect() as conn:
         row: dict[str, Any] | None = (
@@ -92,15 +113,14 @@ def test_decisions_pipeline_writes_run_and_decision_row() -> None:
                         pr.status,
                         d.run_id AS decision_run_id,
                         d.policy_version,
-                        d.policy_hash,
                         d.decision,
                         d.score,
+                        d.top_reason,
                         d.reasons,
-                        d.explanation_json,
                         d.created_at
                     FROM pipeline_runs pr
                     LEFT JOIN decisions d ON d.run_id = pr.id
-                    WHERE pr.pipeline = 'decisions'
+                    WHERE pr.pipeline = 'decision'
                       AND (
                         CAST(:before AS timestamptz) IS NULL
                         OR pr.started_at > CAST(:before AS timestamptz)
@@ -115,17 +135,16 @@ def test_decisions_pipeline_writes_run_and_decision_row() -> None:
             .first()
         )
 
-        assert row is not None, "Expected a new pipeline_runs row for pipeline='decisions'"
+        assert row is not None, "Expected a new pipeline_runs row for pipeline='decision'"
         assert row["status"] == "succeeded"
         assert row["decision_run_id"] == row["run_id"]
 
-        assert row["policy_version"] == "v0"
-        assert isinstance(row["policy_hash"], str) and len(row["policy_hash"]) == 64
+        assert row["policy_version"] == "v1"
         assert row["decision"] is not None
         assert row["score"] is not None
+        assert row["top_reason"] is not None
         assert row["created_at"] is not None
         assert isinstance(row["reasons"], list)
-        assert isinstance(row["explanation_json"], dict)
 
         decision_count = conn.execute(
             text("SELECT COUNT(*) FROM decisions WHERE run_id = :run_id"),

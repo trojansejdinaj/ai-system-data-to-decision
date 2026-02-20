@@ -116,13 +116,22 @@ class RunTracker:
             # don't raise here; counts are best-effort and shouldn't break the pipeline
             self.db.rollback()
 
-    def succeed(self, records_in: int | None = None, records_out: int | None = None):
+    def succeed(
+        self,
+        records_in: int | None = None,
+        records_out: int | None = None,
+        meta: dict | None = None,
+    ):
         finished_at = datetime.now(UTC)
         duration_ms = int((finished_at - self.started_at).total_seconds() * 1000)
 
         self.row.status = "succeeded"
         self.row.finished_at = finished_at
         self.row.duration_ms = duration_ms
+        if meta:
+            current_meta = dict(self.row.meta or {})
+            current_meta.update(meta)
+            self.row.meta = current_meta
         # ensure error_summary is null on success
         self.row.error_summary = None
         if records_in is not None:

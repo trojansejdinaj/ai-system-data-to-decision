@@ -7,11 +7,13 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
-from app.decisions import (
-    DecisionPolicy,
+from app.decision import (
     canonicalize_input_payload,
     compute_input_hash,
     save_decision_output,
+)
+from app.decision_policy.policy_v0 import (
+    DecisionPolicy,
 )
 
 pytestmark = pytest.mark.integration

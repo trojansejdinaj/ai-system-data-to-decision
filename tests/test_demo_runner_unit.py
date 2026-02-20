@@ -52,6 +52,9 @@ def test_format_demo_summary_has_expected_block_shape() -> None:
         duration_ms=87,
         records_in=20,
         records_out=10,
+        decision="approve",
+        score=90,
+        top_reason="no_flags_detected",
     )
 
     lines = rendered.splitlines()
@@ -65,6 +68,9 @@ def test_format_demo_summary_has_expected_block_shape() -> None:
     assert "duration_ms : 87" in rendered
     assert "records_in  : 20" in rendered
     assert "records_out : 10" in rendered
+    assert "decision    : approve" in rendered
+    assert "score       : 90" in rendered
+    assert "top_reason  : no_flags_detected" in rendered
 
 
 def test_demo_fail_marks_failed_and_prints_summary_once(
@@ -76,6 +82,11 @@ def test_demo_fail_marks_failed_and_prints_summary_once(
     monkeypatch.setattr(demo_main, "SessionLocal", lambda: fake_db)
     monkeypatch.setattr(demo_main, "get_logger", lambda _name: fake_logger)
     monkeypatch.setattr(demo_main, "_run_python_module", lambda _module, _args=(): None)
+    monkeypatch.setattr(
+        demo_main,
+        "_run_decision_pipeline",
+        lambda: {"decision": "review", "score": 70, "top_reason": "high_flag_density"},
+    )
     monkeypatch.setattr(demo_main, "_collect_subpipeline_counts", lambda _db, _since: (20, 10))
     monkeypatch.setenv("DEMO_FAIL", "1")
 
@@ -91,3 +102,42 @@ def test_demo_fail_marks_failed_and_prints_summary_once(
     assert "Forced demo failure" in row.error_summary
     assert row.records_in == 20
     assert row.records_out == 10
+
+
+def test_demo_success_calls_decision_pipeline_and_surfaces_summary(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake_db = FakeSession()
+    fake_logger = FakeLogger()
+    state = {"decision_called": 0}
+
+    def _fake_run_decision_pipeline() -> dict[str, str | int]:
+        state["decision_called"] += 1
+        return {
+            "decision": "review",
+            "score": 70,
+            "top_reason": "high_flag_density",
+        }
+
+    monkeypatch.setattr(demo_main, "SessionLocal", lambda: fake_db)
+    monkeypatch.setattr(demo_main, "get_logger", lambda _name: fake_logger)
+    monkeypatch.setattr(demo_main, "_run_python_module", lambda _module, _args=(): None)
+    monkeypatch.setattr(demo_main, "_run_decision_pipeline", _fake_run_decision_pipeline)
+    monkeypatch.setattr(demo_main, "_collect_subpipeline_counts", lambda _db, _since: (20, 10))
+    monkeypatch.setattr(demo_main, "compute_features_for_run", lambda _db, _run_id, dataset_key: [])
+
+    exit_code = demo_main.main()
+    out = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert state["decision_called"] == 1
+    assert out.count("DEMO SUMMARY") == 1
+    assert "decision    : review" in out
+    assert "score       : 70" in out
+    assert "top_reason  : high_flag_density" in out
+
+    row = _latest_demo_row(fake_db)
+    assert row.status == "succeeded"
+    assert row.meta["decision"] == "review"
+    assert row.meta["score"] == 70
+    assert row.meta["top_reason"] == "high_flag_density"

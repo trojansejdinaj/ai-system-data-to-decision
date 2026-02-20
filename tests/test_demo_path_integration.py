@@ -121,6 +121,9 @@ def test_make_demo_creates_successful_pipeline_runs(tmp_path: Path) -> None:
         f"`make demo` failed:\nSTDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
     )
     assert proc.stdout.count("DEMO SUMMARY") == 1, proc.stdout
+    assert "decision    :" in proc.stdout
+    assert "score       :" in proc.stdout
+    assert "top_reason  :" in proc.stdout
 
     with engine.connect() as conn:
         rows = (
@@ -129,7 +132,7 @@ def test_make_demo_creates_successful_pipeline_runs(tmp_path: Path) -> None:
                     """
                     SELECT id, pipeline, status, started_at
                     FROM pipeline_runs
-                    WHERE pipeline IN ('ingest', 'flags')
+                    WHERE pipeline IN ('ingest', 'flags', 'decision')
                       AND (:before IS NULL OR started_at > :before)
                     ORDER BY started_at ASC
                     """
@@ -141,6 +144,7 @@ def test_make_demo_creates_successful_pipeline_runs(tmp_path: Path) -> None:
         )
 
     assert rows, "Expected at least one new pipeline_runs row from `make demo`."
+    assert any(row["pipeline"] == "decision" for row in rows)
 
     expected_success = _success_status_value()
     bad_rows = [row for row in rows if row["status"] != expected_success]

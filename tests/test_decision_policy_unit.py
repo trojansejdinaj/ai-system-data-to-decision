@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from app.decisions import DecisionPolicy, PolicyRule, compute_input_hash
+from app.decision import compute_input_hash
+from app.decision_policy.policy_v0 import DecisionPolicy, PolicyRule
 
 
 def _build_threshold_test_policy(*, policy_version: str = "v1") -> DecisionPolicy:

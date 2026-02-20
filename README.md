@@ -40,7 +40,7 @@ A minimal, end-to-end data pipeline that turns messy source files into decision-
 - For v0, `dataset_key == clean.clean_records.source` (in demo runs, `dataset_key` comes from `DEMO_SOURCE`)
 - Adds a `decisions` table (public schema) for policy outputs:
   `policy_version`, `policy_hash`, `decision`, `score`, `reasons`, `explanation_json`
-- Decision policy command: `uv run python -m app.decisions`
+- Decision policy command: `uv run python -m app.decision`
 
 ---
 
@@ -72,7 +72,7 @@ PYTHONPATH=src uv run python -m app.flags
 ### 5) Run the decision policy pipeline
 
 ```bash
-uv run python -m app.decisions
+uv run python -m app.decision
 ```
 
 ### 6) Proof query: check persisted run tracking + decisions

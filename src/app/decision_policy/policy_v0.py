@@ -41,9 +41,7 @@ class DecisionInput:
             distinct_categories=payload.get("distinct_categories"),
             avg_value_decimal=payload.get("avg_value_decimal"),
             extras={
-                str(key): value
-                for key, value in payload.items()
-                if str(key) not in known_keys
+                str(key): value for key, value in payload.items() if str(key) not in known_keys
             },
         )
 
@@ -65,6 +63,7 @@ class DecisionResult:
     decision: DecisionLabel
     score: int
     reasons: list[str]
+    top_reason: str
     explanation_json: dict[str, Any]
 
 
@@ -151,6 +150,7 @@ class DecisionPolicy:
 
         policy_hash = compute_policy_hash(self.snapshot())
         reasons = [str(hit["reason"]) for hit in hits]
+        top_reason = reasons[0] if reasons else "no_reason_recorded"
         feature_snapshot = {name: used_features[name] for name in sorted(used_features)}
 
         explanation_json = {
@@ -161,9 +161,7 @@ class DecisionPolicy:
                 "review_min": self.review_min,
             },
             "threshold_semantics": (
-                "approve if score >= approve_min; "
-                "review if score >= review_min; "
-                "reject otherwise"
+                "approve if score >= approve_min; review if score >= review_min; reject otherwise"
             ),
             "score_start": self.score_start,
             "score_end": score,
@@ -184,6 +182,7 @@ class DecisionPolicy:
             decision=decision,
             score=score,
             reasons=reasons,
+            top_reason=top_reason,
             explanation_json=explanation_json,
         )
 
@@ -225,7 +224,6 @@ def _matches(operator: str, actual: float, threshold: float) -> bool:
 
 
 def _decision_for_score(score: int, *, approve_min: int, review_min: int) -> DecisionLabel:
-    # Threshold semantics are inclusive: score >= threshold qualifies.
     if score >= approve_min:
         return "approve"
     if score >= review_min:

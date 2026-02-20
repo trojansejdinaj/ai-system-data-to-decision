@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
 from collections.abc import Sequence
@@ -13,6 +14,9 @@ from app.observability.logging import get_logger
 from app.observability.run_tracking import RunTracker
 
 SUMMARY_WIDTH = 60
+DECISION_LINE_RE = re.compile(
+    r"DECISION:\s*(?P<decision>[a-z]+)\s*\|\s*SCORE:\s*(?P<score>\d+)\s*\|\s*TOP_REASON:\s*(?P<top_reason>.+)"
+)
 
 
 def _is_truthy(value: str | None) -> bool:
@@ -28,6 +32,34 @@ def _run_python_module(module: str, args: Sequence[str] = ()) -> None:
         raise RuntimeError(f"{module} exited with code {proc.returncode}")
 
 
+def _run_decision_pipeline() -> dict[str, str | int]:
+    cmd = [sys.executable, "-m", "app.decision"]
+    proc = subprocess.run(cmd, check=False, capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise RuntimeError(
+            "app.decision exited with code "
+            f"{proc.returncode}\nSTDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
+        )
+
+    parsed = _parse_decision_summary(proc.stdout)
+    if parsed is None:
+        raise RuntimeError("app.decision did not emit a parsable decision summary line.")
+    return parsed
+
+
+def _parse_decision_summary(stdout: str) -> dict[str, str | int] | None:
+    matches = DECISION_LINE_RE.findall(stdout)
+    if not matches:
+        return None
+
+    decision, score, top_reason = matches[-1]
+    return {
+        "decision": decision,
+        "score": int(score),
+        "top_reason": top_reason.strip(),
+    }
+
+
 def _collect_subpipeline_counts(db, since_started_at) -> tuple[int, int]:
     row = (
         db.execute(
@@ -37,7 +69,7 @@ def _collect_subpipeline_counts(db, since_started_at) -> tuple[int, int]:
                     COALESCE(SUM(records_in), 0) AS records_in,
                     COALESCE(SUM(records_out), 0) AS records_out
                 FROM pipeline_runs
-                WHERE pipeline IN ('ingest', 'flags')
+                WHERE pipeline IN ('ingest', 'clean', 'flags', 'decision')
                   AND started_at >= :since_started_at
                 """
             ),
@@ -56,6 +88,9 @@ def format_demo_summary(
     duration_ms: int | None,
     records_in: int | None,
     records_out: int | None,
+    decision: str | None,
+    score: int | None,
+    top_reason: str | None,
 ) -> str:
     pairs = [
         ("run_id", run_id),
@@ -63,6 +98,9 @@ def format_demo_summary(
         ("duration_ms", str(duration_ms if duration_ms is not None else "-")),
         ("records_in", str(records_in if records_in is not None else "-")),
         ("records_out", str(records_out if records_out is not None else "-")),
+        ("decision", decision or "-"),
+        ("score", str(score if score is not None else "-")),
+        ("top_reason", top_reason or "-"),
     ]
     key_width = max(len(key) for key, _ in pairs)
 
@@ -80,6 +118,7 @@ def main() -> int:
     tracker = RunTracker(db, logger, pipeline="demo", input_ref="make demo")
 
     exit_code = 0
+    decision_summary: dict[str, str | int] = {}
 
     try:
         with tracker.step("ingest_samples"):
@@ -94,12 +133,19 @@ def main() -> int:
         with tracker.step("flags"):
             _run_python_module("app.flags")
 
+        with tracker.step("decision"):
+            decision_summary = _run_decision_pipeline()
+
         with tracker.step("compute_features", meta={"dataset_key": dataset_key}):
             persisted = compute_features_for_run(db, tracker.run_id, dataset_key=dataset_key)
             tracker.log("features_persisted", feature_count=len(persisted), dataset_key=dataset_key)
 
         records_in, records_out = _collect_subpipeline_counts(db, tracker.started_at)
-        tracker.succeed(records_in=records_in, records_out=records_out)
+        tracker.succeed(
+            records_in=records_in,
+            records_out=records_out,
+            meta=decision_summary,
+        )
 
     except Exception as exc:
         exit_code = 1
@@ -114,6 +160,9 @@ def main() -> int:
                 duration_ms=tracker.row.duration_ms,
                 records_in=tracker.row.records_in,
                 records_out=tracker.row.records_out,
+                decision=str(decision_summary.get("decision", "")) or None,
+                score=(int(decision_summary["score"]) if "score" in decision_summary else None),
+                top_reason=str(decision_summary.get("top_reason", "")) or None,
             )
         )
         db.close()

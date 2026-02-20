@@ -3,7 +3,13 @@ from __future__ import annotations
 import hashlib
 import json
 
-from app.decisions.policy_v0 import POLICY_SNAPSHOT, compute_policy_hash, evaluate
+from app.decision_policy.policy_v0 import (
+    POLICY_SNAPSHOT,
+    DecisionPolicy,
+    PolicyRule,
+    compute_policy_hash,
+    evaluate,
+)
 
 
 def test_evaluate_is_deterministic_for_same_input() -> None:
@@ -50,6 +56,37 @@ def test_reasons_and_rule_hits_are_ordered_by_penalty_desc() -> None:
         "LOW_AVG_VALUE",
     ]
     assert [abs(int(h["delta"])) for h in hits] == [21, 20, 12, 8]
+    assert result.top_reason == "record volume below minimum baseline"
+
+
+def test_reason_ordering_uses_penalty_then_rule_code_tie_break() -> None:
+    policy = DecisionPolicy(
+        policy_version="v0-test",
+        rules=(
+            PolicyRule(
+                code="RULE_B",
+                feature="f_b",
+                operator=">",
+                value=0,
+                penalty=10,
+                reason="reason-b",
+            ),
+            PolicyRule(
+                code="RULE_A",
+                feature="f_a",
+                operator=">",
+                value=0,
+                penalty=10,
+                reason="reason-a",
+            ),
+        ),
+    )
+
+    result = policy.evaluate({"f_a": 1, "f_b": 1})
+
+    assert result.reasons == ["reason-a", "reason-b"]
+    assert result.top_reason == "reason-a"
+    assert [hit["code"] for hit in result.explanation_json["rule_hits"]] == ["RULE_A", "RULE_B"]
 
 
 def test_threshold_boundaries_80_and_79() -> None:

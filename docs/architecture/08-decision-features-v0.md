@@ -52,7 +52,7 @@ Source of truth:
 ## Run
 
 ```bash
-uv run python -m app.decisions
+uv run python -m app.decision
 ```
 
 ## Verify

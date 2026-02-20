@@ -13,7 +13,7 @@ ENV_EXPORT := set -a; source .env; set +a;
 	run dev-all \
 	db-up db-down db-reset db-wait logs \
 	migrate revision metrics \
-	ingest-samples flags runs demo demo-reset clean refresh
+	ingest-samples flags decision runs demo demo-reset clean refresh
 
 # --- Python env --------------------------------------------------------------
 
@@ -99,6 +99,10 @@ clean:
 flags:
 	@$(ENV_EXPORT) \
 	PYTHONPATH=$(PYTHONPATH) uv run python -m app.flags
+
+decision:
+	@$(ENV_EXPORT) \
+	PYTHONPATH=$(PYTHONPATH) uv run python -m app.decision
 
 runs:
 	@$(ENV_EXPORT) \

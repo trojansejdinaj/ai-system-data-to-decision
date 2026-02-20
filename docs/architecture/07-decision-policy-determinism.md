@@ -8,7 +8,7 @@ auditable, and comparable across policy upgrades.
 
 ## Policy Contract
 
-Current policy runtime lives in `src/app/decisions/policy_v0.py` and exposes:
+Current policy runtime lives in `src/app/decision_policy/policy_v0.py` and exposes:
 
 - `DecisionInput`
 - `DecisionPolicy`
@@ -45,7 +45,7 @@ For the same input payload and same `policy_version`, results are deterministic:
 
 Canonical input hash implementation:
 
-- `app.decisions.compute_input_hash(...)`
+- `app.decision.compute_input_hash(...)`
 
 ## Persistence
 
@@ -64,7 +64,7 @@ Canonical input hash implementation:
 
 Write helper:
 
-- `app.decisions.save_decision_output(...)`
+- `app.decision.save_decision_output(...)`
 
 ## Query Examples
 

@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from app.db.models import Decision, DecisionOutput
-from app.decisions.policy_v0 import DecisionResult
+from app.decision_policy.policy_v0 import DecisionResult
 
 
 def write_decision(
@@ -31,11 +31,10 @@ def write_decision(
         id=uuid.uuid4(),
         run_id=resolved_run_id,
         policy_version=result.policy_version,
-        policy_hash=result.policy_hash,
         decision=result.decision,
         score=result.score,
+        top_reason=result.top_reason,
         reasons=list(result.reasons),
-        explanation_json=dict(result.explanation_json),
     )
     db_session.add(row)
     db_session.commit()
