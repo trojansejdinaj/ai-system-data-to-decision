@@ -6,7 +6,7 @@ from typing import Any
 
 from app.db.session import SessionLocal
 from app.decisions.policy_v0 import evaluate
-from app.decisions.service import write_decision
+from app.decisions.service import save_decision_output, write_decision
 from app.observability.logging import get_logger
 from app.observability.run_tracking import RunTracker
 
@@ -59,6 +59,22 @@ def main() -> int:
                 decision=persisted.decision,
                 score=persisted.score,
                 reason_count=len(persisted.reasons or []),
+            )
+
+        with tracker.step("write_decision_output"):
+            persisted_output = save_decision_output(
+                db,
+                result,
+                features,
+                meta={
+                    "pipeline_run_id": str(tracker.run_id),
+                    "policy_hash": result.policy_hash,
+                },
+            )
+            tracker.log(
+                "decision_output_written",
+                decision_output_id=str(persisted_output.id),
+                input_hash=persisted_output.input_hash,
             )
 
         tracker.succeed(records_in=len(features), records_out=1)

@@ -207,6 +207,19 @@ docker compose exec db psql -U d2d_user -d d2d_db -c "SELECT COUNT(*) FROM your_
 docker compose exec db psql -U d2d_user -d d2d_db -c "\dt"
 ```
 
+### Inspect Latest Decision Outputs
+
+```bash
+docker compose exec db psql -U d2d_user -d d2d_db -c \
+"SELECT policy_version, input_hash, decision, score, created_at
+ FROM decision_outputs
+ ORDER BY created_at DESC
+ LIMIT 20;"
+```
+
+`decision_outputs` stores canonical decision artifacts for reproducibility:
+`policy_version`, `input_hash`, `decision`, `score`, `reasons`, `input`, `meta`, and `created_at`.
+
 ### Drop a Table (Careful!)
 
 ```bash

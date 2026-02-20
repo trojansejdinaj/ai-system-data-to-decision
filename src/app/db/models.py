@@ -177,3 +177,26 @@ class Decision(Base):
     reasons: Mapped[list[str]] = mapped_column(JSONB, default=list)
     explanation_json: Mapped[dict] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class DecisionOutput(Base):
+    __tablename__ = "decision_outputs"
+    __table_args__ = (
+        CheckConstraint(
+            "char_length(input_hash) = 64",
+            name="ck_decision_outputs_input_hash_len",
+        ),
+        Index("ix_decision_outputs_policy_version", "policy_version"),
+        Index("ix_decision_outputs_input_hash", "input_hash"),
+        Index("ix_decision_outputs_created_at", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    policy_version: Mapped[str] = mapped_column(Text, nullable=False)
+    input_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    decision: Mapped[str] = mapped_column(String(20), nullable=False)
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    reasons: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    input: Mapped[dict] = mapped_column(JSONB, default=dict)
+    meta: Mapped[dict] = mapped_column(JSONB, default=dict)

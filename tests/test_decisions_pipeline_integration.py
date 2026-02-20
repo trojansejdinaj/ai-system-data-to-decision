@@ -49,6 +49,8 @@ def test_decisions_pipeline_writes_run_and_decision_row() -> None:
         pytest.skip("pipeline_runs table not found. Did you run migrations (make migrate)?")
     if not _table_exists(engine, "decisions"):
         pytest.skip("decisions table not found. Did you run migrations (make migrate)?")
+    if not _table_exists(engine, "decision_outputs"):
+        pytest.skip("decision_outputs table not found. Did you run migrations (make migrate)?")
 
     with engine.connect() as conn:
         before = conn.execute(
