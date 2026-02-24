@@ -4,6 +4,7 @@ This folder contains documentation for the `ai-system-data-to-decision` portfoli
 
 ## Start here
 - Runbook: `docs/runbooks/local-dev.md`
+- Decision API: `docs/decision-api.md`
 
 ## Architecture
 - Week 01 system snapshot: `docs/architecture/01-system-snapshot.md`

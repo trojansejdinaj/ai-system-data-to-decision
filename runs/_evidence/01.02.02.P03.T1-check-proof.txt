@@ -1,0 +1,85 @@
+Task: 01.02.02.P03.T1 — Decision API endpoints (proof pack)
+Date: 2026-02-24
+
+[1] Commands run + outputs
+
+```bash
+$ make fmt
+uv run ruff format .
+79 files left unchanged
+
+$ make lint
+uv run ruff check . --fix
+All checks passed!
+
+$ make test
+uv run python -m pytest -q -m "not integration"
+..............................................                           [100%]
+46 passed, 16 deselected in 0.67s
+
+$ uv run python -m pytest -q -m integration
+................                                                         [100%]
+16 passed, 46 deselected in 7.36s
+```
+
+[2] API verification (copy/paste)
+
+```bash
+# latest
+curl -s http://127.0.0.1:8000/decisions/latest
+
+# by run_id (example)
+curl -s http://127.0.0.1:8000/decisions/64b779c3-7576-4814-b246-a93d1a6a3655
+
+# paging
+curl -s "http://127.0.0.1:8000/decisions?limit=2&offset=0"
+```
+
+[3] Short redacted JSON snippets
+
+```json
+// GET /decisions/latest
+{
+  "decision": {
+    "run_id": "64b779c3-7576-4814-b246-a93d1a6a3655",
+    "decision": "approve",
+    "score": 100,
+    "reasons": ["no_flags_detected"],
+    "explanation_json": {},
+    "policy_version": "v1",
+    "policy_hash": null,
+    "decided_at": "2026-02-24T10:23:03.815350Z"
+  },
+  "run_meta": {
+    "run_started_at": "2026-02-24T10:23:03.789613Z",
+    "run_finished_at": "2026-02-24T10:23:03.816446Z",
+    "records_in": 0,
+    "records_out": 1,
+    "status": "succeeded"
+  }
+}
+
+// GET /decisions/{run_id}
+{
+  "decision": {
+    "run_id": "64b779c3-7576-4814-b246-a93d1a6a3655",
+    "decision": "approve",
+    "score": 100,
+    "policy_version": "v1"
+  },
+  "run_meta": {
+    "status": "succeeded"
+  }
+}
+
+// GET /decisions?limit=2&offset=0
+{
+  "items": [
+    {"decision": {"run_id": "64b7...3655", "decision": "approve", "score": 100}, "run_meta": {"status": "succeeded"}},
+    {"decision": {"run_id": "569c...0af0", "decision": "approve", "score": 80}, "run_meta": {"status": "succeeded"}}
+  ],
+  "count": 2,
+  "limit": 2,
+  "offset": 0
+}
+```

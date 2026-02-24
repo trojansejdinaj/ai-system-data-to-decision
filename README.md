@@ -200,6 +200,72 @@ make lint
 * `GET /dashboard/monthly` — monthly metrics (JSON)
 * `GET /dashboard/trend` — trend view (JSON)
 
+## Decision API
+
+Decision outputs are available over JSON endpoints:
+
+- `GET /decisions/latest`
+- `GET /decisions`
+- `GET /decisions/{run_id}`
+
+### Example curl
+
+```bash
+# latest decision
+curl http://localhost:8000/decisions/latest
+
+# list decisions (paging)
+curl "http://localhost:8000/decisions?limit=2&offset=0"
+
+# list decisions (time window)
+curl "http://localhost:8000/decisions?from=2026-02-01T00:00:00Z&to=2026-02-28T23:59:59Z&limit=50&offset=0"
+
+# lookup by run_id
+curl http://localhost:8000/decisions/123e4567-e89b-12d3-a456-426614174000
+```
+
+### Example response (short)
+
+```json
+{
+  "decision": {
+    "run_id": "123e4567-e89b-12d3-a456-426614174000",
+    "decision": "review",
+    "score": 61,
+    "reasons": ["low_record_volume"],
+    "explanation_json": {"rule_hits": []},
+    "policy_version": "v0",
+    "policy_hash": null,
+    "decided_at": "2026-02-24T12:00:00Z"
+  },
+  "run_meta": {
+    "run_started_at": "2026-02-24T11:59:10Z",
+    "run_finished_at": "2026-02-24T11:59:40Z",
+    "records_in": 10,
+    "records_out": 1,
+    "status": "succeeded"
+  }
+}
+```
+
+List responses use:
+
+```json
+{
+  "items": [],
+  "count": 0,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+### Paging + filtering notes
+
+- Newest-first ordering (`decided_at` descending).
+- Paging uses `limit` (default `50`, max `200`) and `offset`.
+- Time-window filtering uses ISO datetimes via `from` and `to`.
+- If both are present and `from > to`, API returns `400` with an explanation.
+
 ---
 
 ## Outputs / proof artifacts

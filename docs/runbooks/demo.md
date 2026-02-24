@@ -62,6 +62,12 @@ Inspect persisted runs:
 make runs
 ```
 
+Decision results are queryable via API after demo runs:
+
+```bash
+curl http://localhost:8000/decisions/latest
+```
+
 Exit code: **0** (success)
 
 ---

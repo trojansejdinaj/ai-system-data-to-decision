@@ -58,6 +58,7 @@ The dashboard uses the same metric definitions across daily + monthly tables:
 - The dashboard is only as good as the summary tables.
 - If the dashboard loads but shows empty tables, ingest data and rebuild summaries.
 - If `/dashboard/monthly` 500s with “AmbiguousParameter” when filters are omitted, ensure optional date params are CAST to date in the SQL query (typed NULL).
+- Decision outputs are also available as JSON via `/decisions/latest`, `/decisions`, and `/decisions/{run_id}`.
 
 ## Evidence
 See `docs/assets/week-06/` for the screenshot pack.
