@@ -108,6 +108,10 @@ def test_get_by_run_id_returns_matching_payload(client: TestClient) -> None:
     assert body["decision"]["reasons"] == ["fixed_reason"]
     assert body["run_meta"]["status"] == "succeeded"
 
+    alias_response = client.get(f"/decisions/by-run/{run_id}")
+    assert alias_response.status_code == 200, alias_response.text
+    assert alias_response.json()["decision"]["run_id"] == str(run_id)
+
 
 def test_list_returns_paging_metadata(client: TestClient) -> None:
     _ensure_db_available()

@@ -148,5 +148,12 @@ def test_decisions_by_run_id_found_and_not_found() -> None:
     assert found.status_code == 200, found.text
     assert found.json()["decision"]["run_id"] == str(run_id)
 
+    found_alias = client.get(f"/decisions/by-run/{run_id}")
+    assert found_alias.status_code == 200, found_alias.text
+    assert found_alias.json()["decision"]["run_id"] == str(run_id)
+
     missing = client.get(f"/decisions/{uuid.uuid4()}")
     assert missing.status_code == 404
+
+    missing_alias = client.get(f"/decisions/by-run/{uuid.uuid4()}")
+    assert missing_alias.status_code == 404

@@ -2,11 +2,25 @@
 
 JSON endpoints for retrieving persisted decision outputs and run metadata.
 
-## Endpoints
+## Decision endpoints
 
 - `GET /decisions/latest`
 - `GET /decisions?from=&to=&limit=&offset=`
+- `GET /decisions/by-run/{run_id}`
 - `GET /decisions/{run_id}`
+
+## Curl examples
+
+```bash
+# latest decision
+curl -s http://localhost:8000/decisions/latest | python -m json.tool
+
+# by run_id (preferred explicit route)
+curl -s http://localhost:8000/decisions/by-run/<run_id> | python -m json.tool
+
+# by run_id (legacy route, still supported)
+curl -s http://localhost:8000/decisions/<run_id> | python -m json.tool
+```
 
 ## Query params (`GET /decisions`)
 
@@ -25,6 +39,15 @@ Behavior notes:
   - `count`: total matching rows
   - `limit`: applied page size
   - `offset`: applied page offset
+
+## Response shape (high-level)
+
+- Envelope:
+  - `decision`: core policy output (`run_id`, label, score, reasons, policy metadata, `decided_at`)
+  - `run_meta`: pipeline run metadata (`run_started_at`, `run_finished_at`, counts, status)
+- List:
+  - `items`: array of envelopes
+  - `count`, `limit`, `offset`: pagination fields
 
 ## Example response (compact)
 

@@ -337,7 +337,7 @@ def dashboard_decisions_page():
   function renderLatestMissing(){
     renderLatestNotice(
       "No decisions yet",
-      "Run the pipeline to generate your first decision.",
+      "Run `make demo` to generate your first decision.",
       null
     );
   }

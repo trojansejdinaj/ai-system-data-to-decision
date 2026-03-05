@@ -74,10 +74,15 @@ What the page shows:
 - Recent runs table: `run_id`, `time`, `decision`, `score`, `status`
 - Trend section: score over time
 
+What you should see after `make demo`:
+- `GET /decisions/latest` returns `200` and the latest decision card is populated.
+- `GET /decisions/by-run/{run_id}` returns the decision for the `decision_run_id` printed by `make demo`.
+- Decision View (`/dashboard/decisions`) shows the latest card, recent runs row, and score trend without waiting for another refresh cycle.
+
 Empty-state and error behavior:
 - If `GET /decisions/latest` returns `404`, Decision View renders:
   - Title: `No decisions yet`
-  - Subtitle: `Run the pipeline to generate your first decision.`
+  - Subtitle: Run `make demo` to generate your first decision.
 - If `GET /decisions/{run_id}` is used (via `?run_id=<uuid>`) and returns `404`, Decision View renders `Decision not found` and shows the requested `run_id`.
 - If either latest/specific decision fetch fails for non-404 reasons, Decision View renders `Failed to load decision`.
 
@@ -89,6 +94,10 @@ How to run locally:
    - `uv run python -m app.decision`
 3) Open:
    - `http://localhost:8000/dashboard/decisions`
+
+Screenshot placeholder:
+- `![Decision View](../assets/dashboard/decision-view.png)`
+- Capture screenshot after running `make demo` and viewing Decision View.
 
 ## Evidence
 See `docs/assets/week-06/` for the screenshot pack.

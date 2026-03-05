@@ -46,6 +46,15 @@ A minimal, end-to-end data pipeline that turns messy source files into decision-
 
 ## 2-minute demo (portfolio proof)
 
+### 0) Fast path (single command)
+
+```bash
+make demo
+```
+
+`make demo` brings up DB/migrations if needed, ingests sample data, computes features, and persists a decision.
+Use the printed `decision_run_id` in the Decision API/UI examples below.
+
 ### 1) Bring up DB + migrate + run API
 ```bash
 make dev-all
@@ -83,6 +92,18 @@ docker compose exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
 
 docker compose exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
 "SELECT run_id, decision, score, policy_version, policy_hash FROM decisions ORDER BY created_at DESC LIMIT 10;"
+```
+
+### 7) Open dashboard Decision View + hit decision API
+
+* [http://localhost:8000/dashboard/decisions](http://localhost:8000/dashboard/decisions)
+
+```bash
+# latest decision
+curl -s http://localhost:8000/decisions/latest | python -m json.tool
+
+# by run_id (use decision_run_id from make demo output)
+curl -s http://localhost:8000/decisions/by-run/<run_id> | python -m json.tool
 ```
 
 ---
@@ -197,6 +218,7 @@ make lint
 * `POST /ingest` — ingest default/sample inputs
 * `POST /ingest/samples` — ingest bundled samples (recommended for demo)
 * `GET /dashboard` — dashboard UI
+* `GET /dashboard/decisions` — decision view UI
 * `GET /dashboard/monthly` — monthly metrics (JSON)
 * `GET /dashboard/trend` — trend view (JSON)
 
@@ -206,6 +228,7 @@ Decision outputs are available over JSON endpoints:
 
 - `GET /decisions/latest`
 - `GET /decisions`
+- `GET /decisions/by-run/{run_id}` (alias)
 - `GET /decisions/{run_id}`
 
 ### Example curl
@@ -219,6 +242,9 @@ curl "http://localhost:8000/decisions?limit=2&offset=0"
 
 # list decisions (time window)
 curl "http://localhost:8000/decisions?from=2026-02-01T00:00:00Z&to=2026-02-28T23:59:59Z&limit=50&offset=0"
+
+# lookup by run_id (recommended explicit route)
+curl http://localhost:8000/decisions/by-run/123e4567-e89b-12d3-a456-426614174000
 
 # lookup by run_id
 curl http://localhost:8000/decisions/123e4567-e89b-12d3-a456-426614174000

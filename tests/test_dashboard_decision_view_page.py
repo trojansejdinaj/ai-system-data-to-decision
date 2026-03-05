@@ -12,7 +12,11 @@ def test_dashboard_decision_view_page_is_rendered():
     assert "/decisions/latest" in r.text
     assert "/decisions/${encodeURIComponent(runId)}" in r.text
     assert "/decisions?limit=" in r.text
+    assert "latestDecisionBadge" in r.text
+    assert "latestScore" in r.text
+    assert "latestPolicy" in r.text
+    assert "latestDecidedAt" in r.text
     assert "No decisions yet" in r.text
-    assert "Run the pipeline to generate your first decision." in r.text
+    assert "Run `make demo` to generate your first decision." in r.text
     assert "Decision not found" in r.text
     assert "Failed to load decision" in r.text

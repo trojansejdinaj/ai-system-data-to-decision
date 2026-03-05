@@ -77,3 +77,7 @@ def test_decision_by_run_id_with_missing_pipeline_run(monkeypatch) -> None:
         "records_out": None,
         "status": None,
     }
+
+    alias_response = client.get(f"/decisions/by-run/{run_id}")
+    assert alias_response.status_code == 200, alias_response.text
+    assert alias_response.json()["decision"]["run_id"] == run_id

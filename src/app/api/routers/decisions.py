@@ -31,6 +31,13 @@ def get_latest_decision(db: Session = Depends(get_db)):
     return item
 
 
+def _get_decision_or_404(run_id: UUID, db: Session) -> DecisionEnvelope:
+    item = get_decision_by_run_id_service(db, run_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Decision not found")
+    return item
+
+
 @router.get("", response_model=DecisionListResponse)
 def list_decisions(
     db: Session = Depends(get_db),
@@ -58,9 +65,11 @@ def list_decisions(
     )
 
 
+@router.get("/by-run/{run_id}", response_model=DecisionEnvelope)
+def get_decision_by_run_id_alias(run_id: UUID, db: Session = Depends(get_db)):
+    return _get_decision_or_404(run_id, db)
+
+
 @router.get("/{run_id}", response_model=DecisionEnvelope)
 def get_decision_by_run_id(run_id: UUID, db: Session = Depends(get_db)):
-    item = get_decision_by_run_id_service(db, run_id)
-    if item is None:
-        raise HTTPException(status_code=404, detail="Decision not found")
-    return item
+    return _get_decision_or_404(run_id, db)

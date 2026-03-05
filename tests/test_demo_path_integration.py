@@ -121,9 +121,11 @@ def test_make_demo_creates_successful_pipeline_runs(tmp_path: Path) -> None:
         f"`make demo` failed:\nSTDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
     )
     assert proc.stdout.count("DEMO SUMMARY") == 1, proc.stdout
-    assert "decision    :" in proc.stdout
-    assert "score       :" in proc.stdout
-    assert "top_reason  :" in proc.stdout
+    assert "decision" in proc.stdout
+    assert "score" in proc.stdout
+    assert "top_reason" in proc.stdout
+    assert "decision_run_id" in proc.stdout
+    assert "decisions_created" in proc.stdout
 
     with engine.connect() as conn:
         rows = (

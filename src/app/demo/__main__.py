@@ -47,6 +47,26 @@ def _run_decision_pipeline() -> dict[str, str | int]:
     return parsed
 
 
+def _decision_row_count(db) -> int:
+    return int(db.execute(text("SELECT COUNT(*) FROM decisions")).scalar_one())
+
+
+def _latest_decision_run_id(db) -> str | None:
+    row = db.execute(
+        text(
+            """
+            SELECT run_id
+            FROM decisions
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+            """
+        )
+    ).first()
+    if row is None:
+        return None
+    return str(row[0])
+
+
 def _parse_decision_summary(stdout: str) -> dict[str, str | int] | None:
     matches = DECISION_LINE_RE.findall(stdout)
     if not matches:
@@ -84,20 +104,24 @@ def _collect_subpipeline_counts(db, since_started_at) -> tuple[int, int]:
 def format_demo_summary(
     *,
     run_id: str,
+    decision_run_id: str | None,
     status: str,
     duration_ms: int | None,
     records_in: int | None,
     records_out: int | None,
+    decisions_created: int | None,
     decision: str | None,
     score: int | None,
     top_reason: str | None,
 ) -> str:
     pairs = [
         ("run_id", run_id),
+        ("decision_run_id", decision_run_id or "-"),
         ("status", status),
         ("duration_ms", str(duration_ms if duration_ms is not None else "-")),
         ("records_in", str(records_in if records_in is not None else "-")),
         ("records_out", str(records_out if records_out is not None else "-")),
+        ("decisions_created", str(decisions_created if decisions_created is not None else "-")),
         ("decision", decision or "-"),
         ("score", str(score if score is not None else "-")),
         ("top_reason", top_reason or "-"),
@@ -133,12 +157,23 @@ def main() -> int:
         with tracker.step("flags"):
             _run_python_module("app.flags")
 
-        with tracker.step("decision"):
-            decision_summary = _run_decision_pipeline()
-
         with tracker.step("compute_features", meta={"dataset_key": dataset_key}):
             persisted = compute_features_for_run(db, tracker.run_id, dataset_key=dataset_key)
             tracker.log("features_persisted", feature_count=len(persisted), dataset_key=dataset_key)
+
+        with tracker.step("decision"):
+            before_count = _decision_row_count(db)
+            decision_summary = _run_decision_pipeline()
+            after_count = _decision_row_count(db)
+            if after_count <= before_count:
+                raise RuntimeError("Decision pipeline completed but no decision row was persisted.")
+            decision_summary["decisions_created"] = max(after_count - before_count, 0)
+            decision_summary["decision_run_id"] = _latest_decision_run_id(db)
+            tracker.log(
+                "decision_persisted",
+                decisions_created=decision_summary["decisions_created"],
+                decision_run_id=decision_summary["decision_run_id"],
+            )
 
         records_in, records_out = _collect_subpipeline_counts(db, tracker.started_at)
         tracker.succeed(
@@ -156,10 +191,16 @@ def main() -> int:
         print(
             format_demo_summary(
                 run_id=str(tracker.run_id),
+                decision_run_id=str(decision_summary.get("decision_run_id", "")) or None,
                 status=str(tracker.row.status),
                 duration_ms=tracker.row.duration_ms,
                 records_in=tracker.row.records_in,
                 records_out=tracker.row.records_out,
+                decisions_created=(
+                    int(decision_summary["decisions_created"])
+                    if "decisions_created" in decision_summary
+                    else None
+                ),
                 decision=str(decision_summary.get("decision", "")) or None,
                 score=(int(decision_summary["score"]) if "score" in decision_summary else None),
                 top_reason=str(decision_summary.get("top_reason", "")) or None,

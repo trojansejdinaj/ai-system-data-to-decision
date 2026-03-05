@@ -48,10 +48,12 @@ def _latest_demo_row(fake_db: FakeSession):
 def test_format_demo_summary_has_expected_block_shape() -> None:
     rendered = demo_main.format_demo_summary(
         run_id="abc-123",
+        decision_run_id="def-456",
         status="succeeded",
         duration_ms=87,
         records_in=20,
         records_out=10,
+        decisions_created=1,
         decision="approve",
         score=90,
         top_reason="no_flags_detected",
@@ -63,14 +65,16 @@ def test_format_demo_summary_has_expected_block_shape() -> None:
     assert lines[2] == "-" * demo_main.SUMMARY_WIDTH
     assert lines[-1] == "=" * demo_main.SUMMARY_WIDTH
 
-    assert "run_id      : abc-123" in rendered
-    assert "status      : succeeded" in rendered
-    assert "duration_ms : 87" in rendered
-    assert "records_in  : 20" in rendered
-    assert "records_out : 10" in rendered
-    assert "decision    : approve" in rendered
-    assert "score       : 90" in rendered
-    assert "top_reason  : no_flags_detected" in rendered
+    assert "run_id" in rendered and "abc-123" in rendered
+    assert "decision_run_id" in rendered and "def-456" in rendered
+    assert "status" in rendered and "succeeded" in rendered
+    assert "duration_ms" in rendered and "87" in rendered
+    assert "records_in" in rendered and "20" in rendered
+    assert "records_out" in rendered and "10" in rendered
+    assert "decisions_created" in rendered and "1" in rendered
+    assert "decision" in rendered and "approve" in rendered
+    assert "score" in rendered and "90" in rendered
+    assert "top_reason" in rendered and "no_flags_detected" in rendered
 
 
 def test_demo_fail_marks_failed_and_prints_summary_once(
@@ -88,6 +92,8 @@ def test_demo_fail_marks_failed_and_prints_summary_once(
         lambda: {"decision": "review", "score": 70, "top_reason": "high_flag_density"},
     )
     monkeypatch.setattr(demo_main, "_collect_subpipeline_counts", lambda _db, _since: (20, 10))
+    monkeypatch.setattr(demo_main, "_decision_row_count", lambda _db: 0)
+    monkeypatch.setattr(demo_main, "_latest_decision_run_id", lambda _db: "dec-run-1")
     monkeypatch.setenv("DEMO_FAIL", "1")
 
     exit_code = demo_main.main()
@@ -124,6 +130,8 @@ def test_demo_success_calls_decision_pipeline_and_surfaces_summary(
     monkeypatch.setattr(demo_main, "_run_python_module", lambda _module, _args=(): None)
     monkeypatch.setattr(demo_main, "_run_decision_pipeline", _fake_run_decision_pipeline)
     monkeypatch.setattr(demo_main, "_collect_subpipeline_counts", lambda _db, _since: (20, 10))
+    monkeypatch.setattr(demo_main, "_decision_row_count", lambda _db: state["decision_called"])
+    monkeypatch.setattr(demo_main, "_latest_decision_run_id", lambda _db: "dec-run-1")
     monkeypatch.setattr(demo_main, "compute_features_for_run", lambda _db, _run_id, dataset_key: [])
 
     exit_code = demo_main.main()
@@ -132,12 +140,16 @@ def test_demo_success_calls_decision_pipeline_and_surfaces_summary(
     assert exit_code == 0
     assert state["decision_called"] == 1
     assert out.count("DEMO SUMMARY") == 1
-    assert "decision    : review" in out
-    assert "score       : 70" in out
-    assert "top_reason  : high_flag_density" in out
+    assert "decision" in out and "review" in out
+    assert "score" in out and "70" in out
+    assert "top_reason" in out and "high_flag_density" in out
+    assert "decisions_created" in out and "1" in out
+    assert "decision_run_id" in out and "dec-run-1" in out
 
     row = _latest_demo_row(fake_db)
     assert row.status == "succeeded"
     assert row.meta["decision"] == "review"
     assert row.meta["score"] == 70
     assert row.meta["top_reason"] == "high_flag_density"
+    assert row.meta["decisions_created"] == 1
+    assert row.meta["decision_run_id"] == "dec-run-1"

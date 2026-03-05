@@ -98,3 +98,7 @@ def test_decision_by_run_id_not_found_returns_404(client: TestClient) -> None:
     response = client.get(f"/decisions/{uuid.uuid4()}")
     assert response.status_code == 404
     assert response.json() == {"detail": "Decision not found"}
+
+    alias_response = client.get(f"/decisions/by-run/{uuid.uuid4()}")
+    assert alias_response.status_code == 404
+    assert alias_response.json() == {"detail": "Decision not found"}

@@ -1,0 +1,49 @@
+01.02.02.P03.T4 — Integrate with demo path + doc touch-up
+
+Date:
+Operator:
+Branch/commit:
+
+[1] make fmt
+Command:
+
+Output:
+
+[2] make lint
+Command:
+
+Output:
+
+[3] make test
+Command:
+
+Output:
+
+[4] uv run python -m pytest -q -m integration
+Command:
+
+Output:
+
+[5] make demo
+Command:
+
+Tail output (include run_id + decision_run_id + decisions_created):
+
+[6] curl latest endpoint output
+Command:
+curl -s http://localhost:8000/decisions/latest | python -m json.tool
+
+Output:
+
+[7] curl by-run endpoint output
+Command:
+curl -s http://localhost:8000/decisions/by-run/<run_id> | python -m json.tool
+
+Output:
+
+[8] screenshot path used in docs
+Path:
+docs/assets/dashboard/decision-view.png
+
+Notes:
+- Capture screenshot after running `make demo` and opening http://localhost:8000/dashboard/decisions
