@@ -74,6 +74,13 @@ What the page shows:
 - Recent runs table: `run_id`, `time`, `decision`, `score`, `status`
 - Trend section: score over time
 
+Empty-state and error behavior:
+- If `GET /decisions/latest` returns `404`, Decision View renders:
+  - Title: `No decisions yet`
+  - Subtitle: `Run the pipeline to generate your first decision.`
+- If `GET /decisions/{run_id}` is used (via `?run_id=<uuid>`) and returns `404`, Decision View renders `Decision not found` and shows the requested `run_id`.
+- If either latest/specific decision fetch fails for non-404 reasons, Decision View renders `Failed to load decision`.
+
 How to run locally:
 1) Apply DB schema updates:
    - `make migrate`

@@ -221,6 +221,8 @@ def dashboard_decisions_page():
   label { font-size: 12px; color: #444; display: block; margin-bottom: 4px; }
   select { padding: 8px; border-radius: 8px; border: 1px solid #ccc; min-width: 220px; }
   .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .empty-title { font-weight: 600; color: #222; }
+  .empty-subtitle { margin-top: 4px; color: #666; font-size: 13px; }
   </style>
 </head>
 <body>
@@ -317,29 +319,76 @@ def dashboard_decisions_page():
       `<ul class="reason-list">${reasonsToRender.map(r => `<li>${escapeHtml(r)}</li>`).join("")}</ul>`;
   }
 
-  function renderLatestMissing(){
-    $("latestNotice").textContent = "No decisions yet. Run the decision pipeline.";
+  function renderLatestNotice(title, subtitle, runId){
+    const parts = [
+      `<div class="empty-title">${escapeHtml(title)}</div>`,
+    ];
+    if (subtitle) {
+      parts.push(`<div class="empty-subtitle">${escapeHtml(subtitle)}</div>`);
+    }
+    if (runId) {
+      parts.push(`<div class="small mono" style="margin-top: 6px;">${escapeHtml(runId)}</div>`);
+    }
+    $("latestNotice").innerHTML = parts.join("");
     $("latestNotice").style.display = "block";
     $("latestDecisionCard").style.display = "none";
   }
 
+  function renderLatestMissing(){
+    renderLatestNotice(
+      "No decisions yet",
+      "Run the pipeline to generate your first decision.",
+      null
+    );
+  }
+
+  function renderDecisionNotFound(runId){
+    renderLatestNotice("Decision not found", "", `run_id: ${runId}`);
+  }
+
+  function renderLatestLoadError(){
+    renderLatestNotice("Failed to load decision", "", null);
+  }
+
+  function getRequestedRunId(){
+    const params = new URLSearchParams(window.location.search);
+    const runId = (params.get("run_id") || "").trim();
+    return runId || null;
+  }
+
+  async function fetchDecisionByRunId(runId){
+    const decisionResp = await fetch(`/decisions/${encodeURIComponent(runId)}`);
+    if (decisionResp.status === 404){
+      renderDecisionNotFound(runId);
+      return;
+    }
+    if (!decisionResp.ok) {
+      throw new Error("Failed to load decision");
+    }
+    const payload = await decisionResp.json();
+    renderLatest(payload);
+  }
+
   async function fetchLatest(){
     try {
+      const requestedRunId = getRequestedRunId();
+      if (requestedRunId) {
+        await fetchDecisionByRunId(requestedRunId);
+        return;
+      }
+
       const latestResp = await fetch("/decisions/latest");
       if (latestResp.status === 404){
         renderLatestMissing();
         return;
       }
       if (!latestResp.ok) {
-        const msg = await latestResp.text();
-        throw new Error(msg || "Failed to load latest decision.");
+        throw new Error("Failed to load decision");
       }
       const latestPayload = await latestResp.json();
       renderLatest(latestPayload);
     } catch (e){
-      $("latestNotice").style.display = "block";
-      $("latestNotice").textContent = e.message || "Failed to load latest decision.";
-      $("latestDecisionCard").style.display = "none";
+      renderLatestLoadError();
     }
   }
 

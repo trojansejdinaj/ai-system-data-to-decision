@@ -18,6 +18,8 @@ JSON endpoints for retrieving persisted decision outputs and run metadata.
 Behavior notes:
 - Results are newest-first.
 - If both `from` and `to` are present and `from > to`, API returns `400`.
+- `GET /decisions/latest` returns `404` with `{"detail":"No decisions yet"}` when no decision rows exist.
+- `GET /decisions/{run_id}` returns `404` with `{"detail":"Decision not found"}` when the run has no decision.
 - List response shape:
   - `items`: list of decision envelopes
   - `count`: total matching rows

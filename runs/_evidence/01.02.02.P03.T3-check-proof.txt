@@ -1,0 +1,25 @@
+Task: 01.02.02.P03.T3 — Empty-state + error handling + API tests
+Date: 2026-03-05
+
+== make lint ==
+$ make lint
+uv run ruff check . --fix
+All checks passed!
+
+== make test ==
+$ make test
+uv run python -m pytest -q -m "not integration"
+...............................................                          [100%]
+47 passed, 19 deselected in 1.05s
+
+== uv run python -m pytest -q -m integration ==
+$ uv run python -m pytest -q -m integration
+...................                                                      [100%]
+19 passed, 47 deselected in 10.36s
+
+== curl empty-state example ==
+$ curl -i http://localhost:8000/decisions/latest
+HTTP/1.1 404 Not Found
+content-type: application/json
+
+{"detail":"No decisions yet"}

@@ -27,7 +27,7 @@ router = APIRouter(prefix="/decisions", tags=["decisions"])
 def get_latest_decision(db: Session = Depends(get_db)):
     item = get_latest_decision_service(db)
     if item is None:
-        raise HTTPException(status_code=404, detail="No decisions found")
+        raise HTTPException(status_code=404, detail="No decisions yet")
     return item
 
 
@@ -62,5 +62,5 @@ def list_decisions(
 def get_decision_by_run_id(run_id: UUID, db: Session = Depends(get_db)):
     item = get_decision_by_run_id_service(db, run_id)
     if item is None:
-        raise HTTPException(status_code=404, detail=f"No decision found for run_id={run_id}")
+        raise HTTPException(status_code=404, detail="Decision not found")
     return item

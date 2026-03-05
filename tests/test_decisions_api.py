@@ -172,7 +172,8 @@ def test_404_when_latest_empty_and_unknown_run_id(client: TestClient) -> None:
 
     latest = client.get("/decisions/latest")
     assert latest.status_code == 404
-    assert latest.json() == {"detail": "No decisions found"}
+    assert latest.json() == {"detail": "No decisions yet"}
 
     missing = client.get(f"/decisions/{uuid.uuid4()}")
     assert missing.status_code == 404
+    assert missing.json() == {"detail": "Decision not found"}
