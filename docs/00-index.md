@@ -12,6 +12,7 @@ This folder contains documentation for the `ai-system-data-to-decision` portfoli
 - Week 05 transform layer: `docs/architecture/03-transform-layer.md`
 - Monthly metrics definitions: `docs/architecture/04-monthly-metrics.md`
 - Week 06 dashboard v1: `docs/architecture/05-dashboard-v1.md`
+- Week 07 Decision View: `docs/architecture/05-dashboard-v1.md#decision-view-week-07`
 - Week 08 reliability (run tracking + structured logs): `docs/architecture/06-reliability-run-tracking.md`
 - Decision policy determinism + persisted outputs: `docs/architecture/07-decision-policy-determinism.md`
 - Week 09 silver layer (clean.clean_records): `docs/architecture/07-silver-layer-clean-records.md`

@@ -60,5 +60,28 @@ The dashboard uses the same metric definitions across daily + monthly tables:
 - If `/dashboard/monthly` 500s with “AmbiguousParameter” when filters are omitted, ensure optional date params are CAST to date in the SQL query (typed NULL).
 - Decision outputs are also available as JSON via `/decisions/latest`, `/decisions`, and `/decisions/{run_id}`.
 
+## Decision View (Week 07)
+
+URL:
+- `GET /dashboard/decisions`
+
+Data sources:
+- `GET /decisions/latest`
+- `GET /decisions?limit=50&offset=0` (list endpoint)
+
+What the page shows:
+- Latest decision card: decision badge, score, reasons
+- Recent runs table: `run_id`, `time`, `decision`, `score`, `status`
+- Trend section: score over time
+
+How to run locally:
+1) Apply DB schema updates:
+   - `make migrate`
+2) Run the data pipeline (ingest if needed, then decisions):
+   - `uv run python -m app.ingestion --samples`
+   - `uv run python -m app.decision`
+3) Open:
+   - `http://localhost:8000/dashboard/decisions`
+
 ## Evidence
 See `docs/assets/week-06/` for the screenshot pack.

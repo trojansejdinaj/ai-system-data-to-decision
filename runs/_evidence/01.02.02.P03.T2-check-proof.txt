@@ -1,0 +1,86 @@
+Task: 01.02.02.P03.T2 — Decision View check proof
+Date:
+
+Paste command output under each section.
+
+## 1) Format
+```bash
+make fmt
+```
+Output:
+
+## 2) Lint
+```bash
+make lint
+```
+Output:
+
+## 3) Unit and default test suite
+```bash
+make test
+```
+Output:
+
+## 4) Integration tests
+```bash
+uv run python -m pytest -q -m integration
+```
+Output:
+
+## 5) Latest decision API
+```bash
+curl -i http://localhost:8000/decisions/latest
+```
+Output:
+```text
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0HTTP/1.1 200 OK
+date: Thu, 05 Mar 2026 11:57:57 GMT
+server: uvicorn
+content-length: 393
+content-type: application/json
+
+{"decision":{"run_id":"23a525e5-af11-43f6-bd4a-1217e759c351","decision":"approve","score":80,"reasons":["high_flag_density"],"explanation_json":{},"policy_version":"v1","policy_hash":null,"decided_at":"2026-03-05T11:53:51.790274Z"},"run_meta":{"run_started_at":"2026-03-05T11:53:51.761448Z","run_finished_at":"2026-03-05T11:53:51.791782Z","records_in":10,"records_out":1,"status":"succeeded"}}100   393  100   393    0     0  45852      0 --:--:-- --:--:-- --:--:-- 49125
+```
+
+## 6) Decisions list API
+```bash
+curl -i "http://localhost:8000/decisions?limit=5&offset=0"
+```
+Output:
+```text
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+100  1253  100  1253    0     0  31176      0 --:--:-- --:--:-- --:--:-- 31325
+HTTP/1.1 200 OK
+date: Thu, 05 Mar 2026 11:57:56 GMT
+server: uvicorn
+content-length: 1253
+content-type: application/json
+
+{"items":[{"decision":{"run_id":"23a525e5-af11-43f6-bd4a-1217e759c351","decision":"approve","score":80,"reasons":["high_flag_density"],"explanation_json":{},"policy_version":"v1","policy_hash":null,"decided_at":"2026-03-05T11:53:51.790274Z"},"run_meta":{"run_started_at":"2026-03-05T11:53:51.761448Z","run_finished_at":"2026-03-05T11:53:51.791782Z","records_in":10,"records_out":1,"status":"succeeded"}},{"decision":{"run_id":"45094b71-2c11-4d90-b6bf-c3a4c41bee82","decision":"approve","score":100,"reasons":["no_flags_detected"],"explanation_json":{},"policy_version":"v1","policy_hash":null,"decided_at":"2026-03-05T11:53:48.584346Z"},"run_meta":{"run_started_at":"2026-03-05T11:53:48.555075Z","run_finished_at":"2026-03-05T11:53:48.585878Z","records_in":0,"records_out":1,"status":"succeeded"}},{"decision":{"run_id":"260f64d8-0cc1-4052-beed-21e4de092f89","decision":"review","score":73,"reasons":["test_reason"],"explanation_json":{"score_end":73,"policy_version":"v0"},"policy_version":"v0","policy_hash":null,"decided_at":"2026-03-05T11:53:48.150468Z"},"run_meta":{"run_started_at":"2026-03-05T11:53:46.150468Z","run_finished_at":"2026-03-05T11:53:47.150468Z","records_in":10,"records_out":1,"status":"succeeded"}}],"count":3,"limit":5,"offset":0}
+```
+
+## 7) Decision View page
+```bash
+curl -i http://localhost:8000/dashboard/decisions
+```
+Output:
+```text
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0HTTP/1.1 200 OK
+date: Thu, 05 Mar 2026 11:57:54 GMT
+server: uvicorn
+content-length: 9217
+content-type: text/html; charset=utf-8
+```
+
+Manual UI check:
+- Tried to open `http://localhost:8000/dashboard/decisions` from this headless CLI environment; browser-based manual verification is not available here.
+- API + HTML sanity checks passed:
+  - `GET /decisions/latest` returned decision card data fields (`decision`, `score`, `reasons`, `run_meta.status`).
+  - `GET /decisions?limit=5&offset=0` returned rows with run/time/decision/score/status data.
+  - `GET /dashboard/decisions` returned the page with JS wiring for latest card, recent runs table, and score-over-time trend rendering.
